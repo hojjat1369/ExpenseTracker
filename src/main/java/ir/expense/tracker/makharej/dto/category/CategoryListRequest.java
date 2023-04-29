@@ -1,4 +1,4 @@
-package ir.expense.tracker.makharej.dto;
+package ir.expense.tracker.makharej.dto.category;
 
 
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
@@ -7,7 +7,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
@@ -16,9 +15,7 @@ import javax.validation.constraints.NotNull;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CategoryRequest {
+public class CategoryListRequest {
 
-	@NotNull(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
-	@NotEmpty(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
 	private String name;
 }

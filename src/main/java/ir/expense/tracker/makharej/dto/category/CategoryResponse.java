@@ -1,4 +1,4 @@
-package ir.expense.tracker.makharej.dto;
+package ir.expense.tracker.makharej.dto.category;
 
 
 import lombok.Builder;

@@ -7,4 +7,6 @@ public class ErrorMessages {
 	public static final String ID_CANNOT_BE_NULL = "id cannot be null!";
 	public static final String NAME_CANNOT_BE_NULL_OR_EMPTY = "name cannot be null/empty!";
 	public static final String DUPLICATE_CATEGORY_NAME = "there is another category with this name!";
+
+	public static final String Expense_NOT_FOUND_EXCEPTION = "expense not found!";
 }

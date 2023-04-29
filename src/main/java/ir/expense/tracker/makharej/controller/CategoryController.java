@@ -3,10 +3,10 @@ package ir.expense.tracker.makharej.controller;
 
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
 import ir.expense.tracker.makharej.common.exception.DuplicateCategoryException;
-import ir.expense.tracker.makharej.dto.CategoryListRequest;
-import ir.expense.tracker.makharej.dto.CategoryRequest;
-import ir.expense.tracker.makharej.dto.CategoryResponse;
-import ir.expense.tracker.makharej.dto.CategoryUpdateRequest;
+import ir.expense.tracker.makharej.dto.category.CategoryListRequest;
+import ir.expense.tracker.makharej.dto.category.CategoryRequest;
+import ir.expense.tracker.makharej.dto.category.CategoryResponse;
+import ir.expense.tracker.makharej.dto.category.CategoryUpdateRequest;
 import ir.expense.tracker.makharej.entity.Category;
 import ir.expense.tracker.makharej.service.CategoryService;
 import lombok.RequiredArgsConstructor;

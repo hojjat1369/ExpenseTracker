@@ -2,6 +2,7 @@ package ir.expense.tracker.makharej.repository;
 
 
 import ir.expense.tracker.makharej.entity.Category;
+import ir.expense.tracker.makharej.entity.Expense;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,9 +12,8 @@ import java.util.List;
 
 
 @Repository
-public interface CategoryRepository extends JpaRepository<Category, Long> {
+public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
-	@Query("Select c from Category c where c.name like :name")
-	public List<Category> findByNameContaining(@Param("name") String name);
-	public Category findByName(String name);
+	@Query("Select e from Expense e where e.name like :name")
+	public List<Expense> findByNameContaining(@Param("name") String name);
 }
