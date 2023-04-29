@@ -2,6 +2,7 @@ package ir.expense.tracker.makharej.controller;
 
 
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
+import ir.expense.tracker.makharej.dto.CategoryListRequest;
 import ir.expense.tracker.makharej.dto.CategoryRequest;
 import ir.expense.tracker.makharej.dto.CategoryResponse;
 import ir.expense.tracker.makharej.dto.CategoryUpdateRequest;
@@ -10,10 +11,10 @@ import ir.expense.tracker.makharej.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.List;
 
 
 @Controller
@@ -46,6 +47,14 @@ public class CategoryController {
 
 		Category category = categoryService.findCategoryById(id);
 		return CategoryResponse.builder().name(category.getName()).id(category.getId()).build();
+	}
+
+	@GetMapping(path = "/find")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public List<CategoryResponse> findCategories(@RequestParam CategoryListRequest categoryListRequest) throws CategoryNotFoundException {
+
+		return categoryService.find(categoryListRequest);
 	}
 
 	@DeleteMapping
