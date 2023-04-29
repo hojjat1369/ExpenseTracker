@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
 
 @Service
 @Slf4j
@@ -17,7 +20,7 @@ public class CategoryService {
 
 	private final CategoryRepository categoryRepository;
 
-	public CategoryResponse createCategory(CategoryRequest categoryRequest)
+	public CategoryResponse createCategory(@Valid @NotNull CategoryRequest categoryRequest)
 	{
 
 		Category category = Category.builder().name(categoryRequest.getName()).build();

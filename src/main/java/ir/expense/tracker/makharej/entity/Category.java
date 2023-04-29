@@ -3,6 +3,7 @@ package ir.expense.tracker.makharej.entity;
 
 import lombok.*;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Table;
 
