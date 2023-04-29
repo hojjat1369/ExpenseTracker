@@ -6,10 +6,11 @@ import lombok.*;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Table;
+import javax.persistence.UniqueConstraint;
 
 
 @Entity
-@Table(name = "category")
+@Table(name = "category", uniqueConstraints = @UniqueConstraint(columnNames = { "name", "enalbe"}))
 @Builder
 @Getter
 @Setter
@@ -17,5 +18,6 @@ import javax.persistence.Table;
 @AllArgsConstructor
 public class Category extends AbstractEntity {
 
+	@Column(nullable = false)
 	private String name;
 }

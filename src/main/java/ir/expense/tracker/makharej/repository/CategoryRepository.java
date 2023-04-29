@@ -15,4 +15,5 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
 	@Query("Select c from Category c where c.name like :place")
 	public List<Category> findByNameContaining(@Param("name") String name);
+	public Category findByName(String name);
 }
