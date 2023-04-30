@@ -4,6 +4,7 @@ package ir.expense.tracker.makharej.service;
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
 import ir.expense.tracker.makharej.common.exception.DuplicateCategoryException;
 import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
+import ir.expense.tracker.makharej.common.messages.ErrorMessages;
 import ir.expense.tracker.makharej.dto.category.CategoryListRequest;
 import ir.expense.tracker.makharej.dto.category.CategoryResponse;
 import ir.expense.tracker.makharej.dto.category.CategoryUpdateRequest;
@@ -14,10 +15,14 @@ import ir.expense.tracker.makharej.entity.User;
 import ir.expense.tracker.makharej.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,9 +30,21 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class UserService {
+public class UserService implements UserDetailsService {
 
 	private final UserRepository userRepository;
+
+	@Override
+	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+
+		User user = findUserByUsername(username);
+		if(user == null)
+		{
+			log.error("user {} not found!", username);
+			throw new UsernameNotFoundException(ErrorMessages.USER_NOT_FOUND);
+		}
+		return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), new ArrayList<>());
+	}
 
 	public UserResponse createUser(@Valid @NotNull UserRequest request) {
 
@@ -51,15 +68,14 @@ public class UserService {
 		return toUserResponse(user);
 	}
 
-	public UserResponse findById(Long id) throws UserNotFoundException
-	{
+	public UserResponse findById(Long id) throws UserNotFoundException {
 		return toUserResponse(findUserById(id));
 	}
 	public User findUserById(Long id) throws UserNotFoundException
 	{
 		return userRepository.findById(id).orElseThrow(UserNotFoundException::new);
 	}
-	public User findUserByUsername(String username) throws UserNotFoundException
+	public User findUserByUsername(String username)
 	{
 		return userRepository.findByUsername(username);
 	}
