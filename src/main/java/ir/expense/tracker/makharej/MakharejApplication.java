@@ -14,10 +14,4 @@ public class MakharejApplication {
 		SpringApplication.run(MakharejApplication.class, args);
 	}
 
-	@Bean
-	PasswordEncoder passwordEncoder()
-	{
-		return new BCryptPasswordEncoder();
-	}
-
 }
