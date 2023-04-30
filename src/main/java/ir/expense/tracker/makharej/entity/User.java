@@ -10,14 +10,16 @@ import javax.persistence.UniqueConstraint;
 
 
 @Entity
-@Table(name = "category", uniqueConstraints = @UniqueConstraint(columnNames = { "name", "enable"}))
+@Table(name = "user", uniqueConstraints = @UniqueConstraint(columnNames = { "username", "enable"}))
 @Builder
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Category extends AbstractEntity {
+public class User extends AbstractEntity {
 
 	@Column(nullable = false)
+	private String username;
 	private String name;
+	private String password;
 }
