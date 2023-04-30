@@ -25,4 +25,5 @@ public class ExpenseUpdateRequest {
 	private String note;
 	@JsonFormat(pattern = "yyyy-mm-dd HH:mm")
 	private Date expenseDate;
+	private Long categoryId;
 }

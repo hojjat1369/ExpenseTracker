@@ -36,7 +36,7 @@ public class CategoryService {
 		Category category = Category.builder().name(categoryRequest.getName()).build();
 		categoryRepository.save(category);
 		log.info("category {} is saved.", category.getId());
-		return CategoryResponse.builder().name(category.getName()).id(category.getId()).build();
+		return toCategoryResponse(category);
 	}
 
 	public CategoryResponse updateCategory(@Valid @NotNull CategoryUpdateRequest categoryUpdateRequest) throws CategoryNotFoundException {
@@ -45,7 +45,7 @@ public class CategoryService {
 		category.setName(categoryUpdateRequest.getName());
 		categoryRepository.save(category);
 		log.info("category {} is updated.", category.getId());
-		return CategoryResponse.builder().name(category.getName()).id(category.getId()).build();
+		return toCategoryResponse(category);
 	}
 
 	public List<CategoryResponse> find(@NotNull CategoryListRequest categoryListRequest) {
@@ -60,9 +60,13 @@ public class CategoryService {
 		category.setEnable(null);
 		categoryRepository.save(category);
 		log.info("category {} is deleted.", category.getId());
-		return CategoryResponse.builder().name(category.getName()).id(category.getId()).build();
+		return toCategoryResponse(category);
 	}
 
+	public CategoryResponse findById(Long id) throws CategoryNotFoundException
+	{
+		return toCategoryResponse(categoryRepository.findById(id).orElseThrow(CategoryNotFoundException::new));
+	}
 	public Category findCategoryById(Long id) throws CategoryNotFoundException
 	{
 		return categoryRepository.findById(id).orElseThrow(CategoryNotFoundException::new);

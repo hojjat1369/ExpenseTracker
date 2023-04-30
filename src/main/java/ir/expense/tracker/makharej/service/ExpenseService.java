@@ -2,18 +2,12 @@ package ir.expense.tracker.makharej.service;
 
 
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
-import ir.expense.tracker.makharej.common.exception.DuplicateCategoryException;
 import ir.expense.tracker.makharej.common.exception.ExpenseNotFoundException;
-import ir.expense.tracker.makharej.dto.category.CategoryListRequest;
-import ir.expense.tracker.makharej.dto.category.CategoryRequest;
-import ir.expense.tracker.makharej.dto.category.CategoryResponse;
-import ir.expense.tracker.makharej.dto.category.CategoryUpdateRequest;
 import ir.expense.tracker.makharej.dto.expense.ExpenseRequest;
 import ir.expense.tracker.makharej.dto.expense.ExpenseResponse;
 import ir.expense.tracker.makharej.dto.expense.ExpenseUpdateRequest;
 import ir.expense.tracker.makharej.entity.Category;
 import ir.expense.tracker.makharej.entity.Expense;
-import ir.expense.tracker.makharej.repository.CategoryRepository;
 import ir.expense.tracker.makharej.repository.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,8 +15,6 @@ import org.springframework.stereotype.Service;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-import java.util.List;
-import java.util.stream.Collectors;
 
 
 @Service
@@ -31,17 +23,25 @@ import java.util.stream.Collectors;
 public class ExpenseService {
 
 	private final ExpenseRepository expenseRepository;
+	private final CategoryService categoryService;
 
-	public ExpenseResponse createExpense(@Valid @NotNull ExpenseRequest request) {
+	public ExpenseResponse createExpense(@Valid @NotNull ExpenseRequest request) throws CategoryNotFoundException {
 
-
-		Expense expense = Expense.builder().name(request.getName()).build();
+		Category category = categoryService.findCategoryById(request.getCategoryId());
+		Expense expense = Expense.builder()
+								 .name(request.getName())
+								 .expenseDate(request.getExpenseDate())
+								 .amount(request.getAmount())
+								 .category(category)
+								 .note(request.getNote())
+								 .tag(request.getTag())
+								 .build();
 		expenseRepository.save(expense);
 		log.info("expense {} is saved.", expense.getId());
 		return toExpenseResponse(expense);
 	}
 
-	public ExpenseResponse updateExpense(@Valid @NotNull ExpenseUpdateRequest request) throws ExpenseNotFoundException {
+	public ExpenseResponse updateExpense(@Valid @NotNull ExpenseUpdateRequest request) throws ExpenseNotFoundException, CategoryNotFoundException {
 
 		Expense expense = findExpenseById(request.getId());
 		expense.setName(expense.getName());
@@ -49,6 +49,10 @@ public class ExpenseService {
 		expense.setNote(request.getNote());
 		expense.setTag(request.getTag());
 		expense.setAmount(request.getAmount());
+		if(request.getCategoryId() != null){
+			Category category = categoryService.findCategoryById(request.getCategoryId());
+			expense.setCategory(category);
+		}
 		expenseRepository.save(expense);
 		log.info("expense {} is updated.", expense.getId());
 		return toExpenseResponse(expense);
@@ -81,6 +85,7 @@ public class ExpenseService {
 							  .tag(expense.getTag())
 							  .amount(expense.getAmount())
 							  .note(expense.getNote())
+							  .categoryId(expense.getCategory().getId())
 							  .build();
 	}
 }

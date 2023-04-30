@@ -32,23 +32,20 @@ public class ExpenseController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	@ResponseBody
-	public ExpenseResponse createExpense(@Valid @RequestBody ExpenseRequest request) throws DuplicateCategoryException {
+	public ExpenseResponse createExpense(@Valid @RequestBody ExpenseRequest request) throws CategoryNotFoundException {
 
 		return expenseService.createExpense(request);
 	}
 
 	@PatchMapping
 	@ResponseStatus(HttpStatus.OK)
-	@ResponseBody
-	public ExpenseResponse updateExpense(@Valid @RequestBody ExpenseUpdateRequest request) throws ExpenseNotFoundException {
+	public ExpenseResponse updateExpense(@Valid @RequestBody ExpenseUpdateRequest request) throws ExpenseNotFoundException, CategoryNotFoundException {
 
 		return expenseService.updateExpense(request);
 	}
 
 	@GetMapping
 	@ResponseStatus(HttpStatus.OK)
-	@ResponseBody
 	public ExpenseResponse findExpenseById(@Valid @RequestParam Long id) throws ExpenseNotFoundException {
 
 		return expenseService.findById(id);
@@ -56,7 +53,6 @@ public class ExpenseController {
 
 	@DeleteMapping
 	@ResponseStatus(HttpStatus.OK)
-	@ResponseBody
 	public ExpenseResponse delete(@Valid @RequestParam Long id) throws ExpenseNotFoundException {
 
 		return expenseService.deleteExpense(id);

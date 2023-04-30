@@ -24,4 +24,5 @@ public class ExpenseResponse {
 	private String tag;
 	private String note;
 	private Date expenseDate;
+	private Long categoryId;
 }
