@@ -29,13 +29,6 @@ public class UserController {
 
 	private final UserService userService;
 
-	@PostMapping
-	@ResponseStatus(HttpStatus.CREATED)
-	public UserResponse createUser(@Valid @RequestBody UserRequest request) {
-
-		return userService.createUser(request);
-	}
-
 	@GetMapping
 	@ResponseStatus(HttpStatus.OK)
 	public UserResponse findUserById(@Valid @RequestParam Long id) throws UserNotFoundException {

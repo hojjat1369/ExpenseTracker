@@ -15,6 +15,7 @@ import ir.expense.tracker.makharej.entity.User;
 import ir.expense.tracker.makharej.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -34,14 +35,14 @@ import java.util.stream.Collectors;
 public class UserService {
 
 	private final UserRepository userRepository;
-	private final PasswordEncoder passwordEncoder;
-
+	@Autowired
+	private PasswordEncoder encoder;
 	public UserResponse createUser(@Valid @NotNull UserRequest request) {
 
 		User user = User.builder()
 				.username(request.getUsername())
 				.name(request.getName())
-				.password(passwordEncoder.encode(request.getPassword()))
+				.password(encoder.encode(request.getPassword()))
 				.build();
 		userRepository.save(user);
 		log.info("user {} is saved.", user.getId());

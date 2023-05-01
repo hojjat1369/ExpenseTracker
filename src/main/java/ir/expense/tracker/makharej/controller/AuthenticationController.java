@@ -24,11 +24,20 @@ public class AuthenticationController {
 
 	private final AuthenticationService authenticationService;
 
+	private final UserService userService;
+
 	@PostMapping(path = "/login")
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
 	public LoginResponse login(@Valid @RequestBody LoginRequest request) {
 
 		return authenticationService.login(request);
+	}
+	@PostMapping(path = "/signup")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public UserResponse signup(@Valid @RequestBody UserRequest request) {
+
+		return userService.createUser(request);
 	}
 }
