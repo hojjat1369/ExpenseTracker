@@ -35,8 +35,7 @@ import java.util.stream.Collectors;
 public class UserService {
 
 	private final UserRepository userRepository;
-	@Autowired
-	private PasswordEncoder encoder;
+	private final PasswordEncoder encoder;
 	public UserResponse createUser(@Valid @NotNull UserRequest request) {
 
 		User user = User.builder()
