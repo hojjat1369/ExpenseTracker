@@ -3,10 +3,10 @@ package ir.expense.tracker.makharej.common.util;
 
 import io.jsonwebtoken.*;
 import ir.expense.tracker.makharej.service.UserDetailServiceImpl;
-import ir.expense.tracker.makharej.service.UserDetailsImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -24,7 +24,7 @@ public class JwtUtil {
 
 	public String generateJwtToken(Authentication authentication) {
 
-		UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
+		UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
 		return Jwts.builder()
 				   .setSubject((userPrincipal.getUsername()))

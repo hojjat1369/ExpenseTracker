@@ -26,12 +26,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserDetailServiceImpl implements UserDetailsService {
 
-	private final UserService userService;
+	private final UserRepository userRepository;
 
 	@Override
 	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
-		User user = userService.findUserByUsername(username);
+		User user = userRepository.findByUsername(username);
 		if(user == null)
 		{
 			log.error("user {} not found!", username);

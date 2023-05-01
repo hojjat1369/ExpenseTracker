@@ -18,6 +18,5 @@ import javax.validation.constraints.NotNull;
 public class LoginResponse {
 
 	private String token;
-	private Long userId;
 	private String username;
 }

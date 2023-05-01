@@ -18,14 +18,15 @@ import java.util.List;
 
 
 @Controller
-@RequestMapping(path = "/api/user")
+@RequestMapping(path = "/api/auth")
 @RequiredArgsConstructor
 public class AuthenticationController {
 
 	private final AuthenticationService authenticationService;
 
-	@PostMapping
-	@ResponseStatus(HttpStatus.CREATED)
+	@PostMapping(path = "/login")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
 	public LoginResponse login(@Valid @RequestBody LoginRequest request) {
 
 		return authenticationService.login(request);

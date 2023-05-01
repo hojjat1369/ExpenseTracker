@@ -5,7 +5,6 @@ import ir.expense.tracker.makharej.filter.AuthEntryPointJwt;
 import ir.expense.tracker.makharej.filter.AuthenticationFilter;
 import ir.expense.tracker.makharej.filter.AuthenticationTokenFilter;
 import ir.expense.tracker.makharej.service.UserDetailServiceImpl;
-import ir.expense.tracker.makharej.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -27,14 +26,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 
 @Configuration
-@EnableGlobalMethodSecurity
 public class SecurityConfig {
 
 	@Autowired
-	private UserDetailServiceImpl userDetailsService;
-
-	@Autowired
-	private AuthEntryPointJwt unauthorizedHandler;
+	UserDetailServiceImpl userDetailsService;
 
 	@Bean
 	public AuthenticationTokenFilter authenticationJwtTokenFilter() {
@@ -44,9 +39,9 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http.cors().and().csrf().disable()
-			.exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
+			//.exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
 			.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
-				.authorizeRequests().antMatchers("/api/user/**").permitAll()
+				.authorizeRequests().antMatchers("/api/auth/**").permitAll()
 				.anyRequest().authenticated()
 		;
 
@@ -75,14 +70,4 @@ public class SecurityConfig {
 	public PasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder();
 	}
-
-	/*@Bean
-	public AuthenticationManager authenticationManager(HttpSecurity http, BCryptPasswordEncoder passwordEncoder, UserService userService)
-			throws Exception {
-		return http.getSharedObject(AuthenticationManagerBuilder.class)
-				   .userDetailsService(userService)
-				   .passwordEncoder(passwordEncoder)
-				   .and()
-				   .build();
-	}*/
 }

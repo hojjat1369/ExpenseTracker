@@ -15,6 +15,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -42,9 +43,9 @@ public class AuthenticationService {
 
 		String jwtToken = jwtUtil.generateJwtToken(authentication);
 
-		UserDetailsImpl userDetails = (UserDetailsImpl)authentication.getPrincipal();
+		UserDetails userDetails = (UserDetails)authentication.getPrincipal();
 
-		return LoginResponse.builder().username(userDetails.getUsername()).userId(userDetails.getId()).token(jwtToken).build();
+		return LoginResponse.builder().username(userDetails.getUsername()).token(jwtToken).build();
 
 	}
 }
