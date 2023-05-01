@@ -42,6 +42,13 @@ public class SecurityConfig {
 			//.exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
 			.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
 				.authorizeRequests().antMatchers("/api/auth/**").permitAll()
+				.antMatchers("/actuator/**").permitAll()
+				.antMatchers("/v2/api-docs",
+						 "/configuration/ui",
+						 "/swagger-resources/**",
+						 "/configuration/security",
+						 "/swagger-ui.html",
+						 "/webjars/**").permitAll()
 				.anyRequest().authenticated()
 		;
 
