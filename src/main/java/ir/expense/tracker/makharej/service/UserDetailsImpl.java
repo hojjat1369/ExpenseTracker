@@ -3,6 +3,10 @@ package ir.expense.tracker.makharej.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import ir.expense.tracker.makharej.entity.User;
+import lombok.Builder;
+import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -11,13 +15,12 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
-
+@Setter
+@Getter
 public class UserDetailsImpl implements UserDetails {
 
 	private Long id;
-
 	private String username;
-
 	@JsonIgnore
 	private String password;
 
