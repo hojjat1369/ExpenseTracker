@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.validation.Valid;
@@ -30,29 +31,17 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class UserService implements UserDetailsService {
+public class UserService {
 
 	private final UserRepository userRepository;
-
-	@Override
-	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-
-		User user = findUserByUsername(username);
-		if(user == null)
-		{
-			log.error("user {} not found!", username);
-			throw new UsernameNotFoundException(ErrorMessages.USER_NOT_FOUND);
-		}
-		return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), new ArrayList<>());
-	}
+	private final PasswordEncoder passwordEncoder;
 
 	public UserResponse createUser(@Valid @NotNull UserRequest request) {
-
 
 		User user = User.builder()
 				.username(request.getUsername())
 				.name(request.getName())
-				.password(request.getPassword())
+				.password(passwordEncoder.encode(request.getPassword()))
 				.build();
 		userRepository.save(user);
 		log.info("user {} is saved.", user.getId());

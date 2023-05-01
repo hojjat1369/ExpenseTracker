@@ -8,6 +8,7 @@ import ir.expense.tracker.makharej.dto.category.CategoryListRequest;
 import ir.expense.tracker.makharej.dto.category.CategoryRequest;
 import ir.expense.tracker.makharej.dto.category.CategoryResponse;
 import ir.expense.tracker.makharej.dto.category.CategoryUpdateRequest;
+import ir.expense.tracker.makharej.dto.user.LoginRequest;
 import ir.expense.tracker.makharej.dto.user.UserRequest;
 import ir.expense.tracker.makharej.dto.user.UserResponse;
 import ir.expense.tracker.makharej.service.CategoryService;
@@ -28,6 +29,12 @@ public class UserController {
 
 	private final UserService userService;
 
+	@PostMapping
+	@ResponseStatus(HttpStatus.CREATED)
+	public UserResponse login(@Valid @RequestBody LoginRequest request) {
+
+		return userService.createUser(request);
+	}
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public UserResponse createUser(@Valid @RequestBody UserRequest request) {
