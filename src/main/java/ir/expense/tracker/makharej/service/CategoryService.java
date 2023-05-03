@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import javax.transaction.Transactional;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import java.util.List;
@@ -29,6 +30,7 @@ public class CategoryService {
 	private final CategoryRepository categoryRepository;
 	private final UserService userService;
 
+	@Transactional
 	public CategoryResponse createCategory(@Valid @NotNull CategoryRequest request) throws DuplicateCategoryException, UserNotFoundException {
 
 		Category categoryByName = findCategoryByNameAndUserId(request.getName(), request.getUserId());
@@ -37,7 +39,7 @@ public class CategoryService {
 		{
 			throw new DuplicateCategoryException();
 		}
-		Category category = Category.builder().name(request.getName()).build();
+		Category category = Category.builder().name(request.getName()).user(user).build();
 		categoryRepository.save(category);
 		log.info("category {} is saved.", category.getId());
 		return toCategoryResponse(category);

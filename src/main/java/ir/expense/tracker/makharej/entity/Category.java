@@ -19,7 +19,7 @@ public class Category extends AbstractEntity {
 	private String name;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_fk")
+	@JoinColumn(name = "user_fk", nullable = false)
 	private User user;
 
 }
