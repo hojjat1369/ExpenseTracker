@@ -4,6 +4,13 @@
 
 This repository contains the Expense Tracker source code. Expense Tracker is a Java module developed to ease the process of tracking daily expenses. It's powerful, actively maintained and easy to use.”
 
+TODO:
+
+* Add more unit tests
+* Add integration tests
+* Dokerise the project
+* Add Trigger entity to project
+
 ## Getting started
 
 This Expense Tracker provides simple APIs to work with different types of expense. You can:
