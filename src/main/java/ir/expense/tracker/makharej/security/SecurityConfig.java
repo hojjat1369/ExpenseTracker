@@ -22,6 +22,9 @@ public class SecurityConfig {
 
 	@Autowired
 	UserDetailServiceImpl userDetailsService;
+
+	@Autowired
+	private CustomeAuthPoint unauthorizedHandler;
 	@Bean
 	public AuthenticationTokenFilter authenticationJwtTokenFilter() {
 		return new AuthenticationTokenFilter();
@@ -30,7 +33,7 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http.cors().and().csrf().disable()
-			//.exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
+			.exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
 			.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
 				.authorizeRequests().antMatchers("/api/auth/**").permitAll()
 				.antMatchers("/actuator/**").permitAll()

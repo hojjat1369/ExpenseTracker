@@ -2,6 +2,7 @@ package ir.expense.tracker.makharej.common;
 
 
 import ir.expense.tracker.makharej.common.exception.DomainException;
+import ir.expense.tracker.makharej.common.exception.InvalidToken;
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -33,6 +34,14 @@ public class ExceptionHandler extends ResponseEntityExceptionHandler {
 			errors.put(fieldName, message);
 		});
 		return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+	}
+
+	@org.springframework.web.bind.annotation.ExceptionHandler(value = InvalidToken.class)
+	@ResponseStatus(HttpStatus.BAD_REQUEST)
+	public ResponseEntity<?> handleException(InvalidToken ex) {
+
+		ErrorResponse errorResponse = ErrorResponse.builder().statusCode(HttpStatus.UNAUTHORIZED).message(ex.getMessage()).build();
+		return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
 	}
 
 	@org.springframework.web.bind.annotation.ExceptionHandler(value = DomainException.class)

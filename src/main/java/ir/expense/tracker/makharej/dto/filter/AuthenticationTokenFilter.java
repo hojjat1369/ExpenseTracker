@@ -1,6 +1,7 @@
 package ir.expense.tracker.makharej.dto.filter;
 
 
+import ir.expense.tracker.makharej.common.exception.InvalidToken;
 import ir.expense.tracker.makharej.common.util.JwtUtil;
 import ir.expense.tracker.makharej.service.UserDetailServiceImpl;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,9 @@ public class AuthenticationTokenFilter extends OncePerRequestFilter {
 
 				SecurityContextHolder.getContext().setAuthentication(authentication);
 			}
+		} catch (InvalidToken e) {
+			logger.error("Invalid Token!");
+
 		} catch (Exception e) {
 			logger.error("Cannot set user authentication: {}", e);
 		}

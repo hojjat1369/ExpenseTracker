@@ -4,10 +4,10 @@ package ir.expense.tracker.makharej.common.exception;
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
 
 
-public class UserNotFoundException extends DomainException {
+public class InvalidToken extends DomainException {
 
-	public UserNotFoundException()
+	public InvalidToken()
 	{
-		super(ErrorMessages.USER_NOT_FOUND);
+		super(ErrorMessages.INVALID_TOKEN);
 	}
 }
