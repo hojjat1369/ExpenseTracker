@@ -27,4 +27,8 @@ public class Expense extends AbstractEntity {
 	@JoinColumn(name = "category_fk")
 	private Category category;
 
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "user_fk")
+	private User user;
+
 }

@@ -3,6 +3,7 @@ package ir.expense.tracker.makharej.dto.expense;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
+import ir.expense.tracker.makharej.dto.user.Userable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,7 +18,7 @@ import java.util.Date;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class ExpenseRequest {
+public class ExpenseRequest extends Userable {
 
 	@NotBlank(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
 	@NotNull(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
@@ -34,4 +35,6 @@ public class ExpenseRequest {
 
 	@NotNull(message = ErrorMessages.CATEGORY_CANNOT_BE_NULL)
 	private Long categoryId;
+	@NotNull(message = ErrorMessages.USER_ID_CANNOT_BE_NULL)
+	private Long userId;
 }

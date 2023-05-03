@@ -1,6 +1,7 @@
 package ir.expense.tracker.makharej.controller;
 
 
+import ir.expense.tracker.makharej.aspect.AppendUser;
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
 import ir.expense.tracker.makharej.common.exception.DuplicateCategoryException;
 import ir.expense.tracker.makharej.dto.category.CategoryListRequest;
@@ -28,6 +29,7 @@ public class CategoryController {
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	@ResponseBody
+	@AppendUser
 	public CategoryResponse createCategory(@Valid @RequestBody CategoryRequest categoryRequest) throws DuplicateCategoryException {
 
 		return categoryService.createCategory(categoryRequest);

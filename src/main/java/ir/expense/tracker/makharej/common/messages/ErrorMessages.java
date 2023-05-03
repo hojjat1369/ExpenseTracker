@@ -15,4 +15,6 @@ public class ErrorMessages {
 	public static final String PASSWORD_CANNOT_BE_NULL = "password cannot be null/empty!";
 	public static final String USER_NOT_FOUND = "user not found!";
 	public static final String INTERNAL_ERROR = "internal error!";
+
+	public static final String USER_ID_CANNOT_BE_NULL = "user id cannot be null!";
 }
