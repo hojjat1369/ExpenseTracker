@@ -48,6 +48,7 @@ public class ValidationHandler extends ResponseEntityExceptionHandler {
 	public @ResponseBody ResponseEntity<?> handleException(Exception ex) {
 
 		ErrorResponse errorResponse = ErrorResponse.builder().statusCode(HttpStatus.INTERNAL_SERVER_ERROR).message(ErrorMessages.INTERNAL_ERROR).build();
+		ex.printStackTrace();
 		return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
 	}
 

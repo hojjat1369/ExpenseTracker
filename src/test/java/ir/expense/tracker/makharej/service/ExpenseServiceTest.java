@@ -14,6 +14,7 @@ import ir.expense.tracker.makharej.entity.Category;
 import ir.expense.tracker.makharej.entity.Expense;
 import ir.expense.tracker.makharej.repository.CategoryRepository;
 import ir.expense.tracker.makharej.repository.ExpenseRepository;
+import ir.expense.tracker.makharej.repository.ExpenseRepositoryImpl;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,9 @@ public class ExpenseServiceTest {
 	@Mock
 	private UserService userService;
 
+	@Mock
+	private ExpenseRepositoryImpl expenseRepositoryImpl;
+
 	private ExpenseService expenseService;
 	private Date expenseDate = Calendar.getInstance().getTime();
 	private Double amount = 5000.0;
@@ -51,7 +55,7 @@ public class ExpenseServiceTest {
 	@BeforeEach
 	public void setup()
 	{
-		expenseService = new ExpenseService(expenseRepository, categoryService, userService);
+		expenseService = new ExpenseService(expenseRepository, categoryService, userService, expenseRepositoryImpl);
 	}
 
 	@Test

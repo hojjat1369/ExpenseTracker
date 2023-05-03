@@ -12,6 +12,7 @@ import ir.expense.tracker.makharej.entity.Category;
 import ir.expense.tracker.makharej.entity.Expense;
 import ir.expense.tracker.makharej.entity.User;
 import ir.expense.tracker.makharej.repository.ExpenseRepository;
+import ir.expense.tracker.makharej.repository.ExpenseRepositoryImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,8 +32,8 @@ public class ExpenseService {
 
 	private final ExpenseRepository expenseRepository;
 	private final CategoryService categoryService;
-
 	private final UserService userService;
+	private final ExpenseRepositoryImpl expenseRepositoryImpl;
 
 	public ExpenseResponse createExpense(@Valid @NotNull ExpenseRequest request) throws CategoryNotFoundException, UserNotFoundException {
 
@@ -97,7 +98,9 @@ public class ExpenseService {
 
 	public List<ExpenseResponse> findAll(ExpenseListRequest request)
 	{
-		return new ArrayList<>();
+
+		List<Expense> expenses = expenseRepository.searchExpenses(request);
+		return expenses.stream().map(this::toExpenseResponse).toList();
 	}
 
 	private ExpenseResponse toExpenseResponse(Expense expense)
