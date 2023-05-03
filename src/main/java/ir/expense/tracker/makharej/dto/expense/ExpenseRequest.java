@@ -4,20 +4,19 @@ package ir.expense.tracker.makharej.dto.expense;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
 import ir.expense.tracker.makharej.dto.user.Userable;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.util.Date;
+import java.util.Locale;
 
 
 @Builder
-@Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Getter
+@Setter
 public class ExpenseRequest extends Userable {
 
 	@NotBlank(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
@@ -29,12 +28,10 @@ public class ExpenseRequest extends Userable {
 	private String tag;
 	private String note;
 
-	@JsonFormat(pattern = "yyyy-mm-dd HH:mm")
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern= "yyyy-MM-dd HH:mm:ss", locale = "Asia/Tehran")
 	@NotNull(message = ErrorMessages.DATE_CANNOT_BE_NULL)
 	private Date expenseDate;
 
 	@NotNull(message = ErrorMessages.CATEGORY_CANNOT_BE_NULL)
 	private Long categoryId;
-	@NotNull(message = ErrorMessages.USER_ID_CANNOT_BE_NULL)
-	private Long userId;
 }

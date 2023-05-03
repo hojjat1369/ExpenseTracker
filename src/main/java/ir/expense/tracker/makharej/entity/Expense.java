@@ -24,11 +24,11 @@ public class Expense extends AbstractEntity {
 	private Date expenseDate;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "category_fk")
+	@JoinColumn(name = "category_fk", nullable = false)
 	private Category category;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_fk")
+	@JoinColumn(name = "user_fk", nullable = false)
 	private User user;
 
 }

@@ -25,12 +25,12 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @RequiredArgsConstructor
+@Transactional
 public class CategoryService {
 
 	private final CategoryRepository categoryRepository;
 	private final UserService userService;
 
-	@Transactional
 	public CategoryResponse createCategory(@Valid @NotNull CategoryRequest request) throws DuplicateCategoryException, UserNotFoundException {
 
 		Category categoryByName = findCategoryByNameAndUserId(request.getName(), request.getUserId());
@@ -81,6 +81,11 @@ public class CategoryService {
 	public Category findCategoryByNameAndUserId(String name, Long userId)
 	{
 		return categoryRepository.findByNameAndUserId(name, userId);
+	}
+
+	public Category findCategoryByIdAndUserId(Long id, Long userId)
+	{
+		return categoryRepository.findByIdAndUserId(id, userId);
 	}
 
 	private CategoryResponse toCategoryResponse(Category category)

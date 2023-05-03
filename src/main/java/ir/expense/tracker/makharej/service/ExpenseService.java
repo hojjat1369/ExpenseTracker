@@ -3,31 +3,48 @@ package ir.expense.tracker.makharej.service;
 
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
 import ir.expense.tracker.makharej.common.exception.ExpenseNotFoundException;
+import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
+import ir.expense.tracker.makharej.dto.expense.ExpenseListRequest;
 import ir.expense.tracker.makharej.dto.expense.ExpenseRequest;
 import ir.expense.tracker.makharej.dto.expense.ExpenseResponse;
 import ir.expense.tracker.makharej.dto.expense.ExpenseUpdateRequest;
 import ir.expense.tracker.makharej.entity.Category;
 import ir.expense.tracker.makharej.entity.Expense;
+import ir.expense.tracker.makharej.entity.User;
 import ir.expense.tracker.makharej.repository.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import javax.transaction.Transactional;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
+import java.util.ArrayList;
+import java.util.List;
 
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
+@Transactional
 public class ExpenseService {
 
 	private final ExpenseRepository expenseRepository;
 	private final CategoryService categoryService;
 
-	public ExpenseResponse createExpense(@Valid @NotNull ExpenseRequest request) throws CategoryNotFoundException {
+	private final UserService userService;
 
-		Category category = categoryService.findCategoryById(request.getCategoryId());
+	public ExpenseResponse createExpense(@Valid @NotNull ExpenseRequest request) throws CategoryNotFoundException, UserNotFoundException {
+
+		Category category = categoryService.findCategoryByIdAndUserId(request.getCategoryId(), request.getUserId());
+		if(category == null)
+		{
+			throw new CategoryNotFoundException();
+		}
+		User user = userService.findUserById(request.getUserId());
+		if(user == null){
+			throw new UserNotFoundException();
+		}
 		Expense expense = Expense.builder()
 								 .name(request.getName())
 								 .expenseDate(request.getExpenseDate())
@@ -35,6 +52,7 @@ public class ExpenseService {
 								 .category(category)
 								 .note(request.getNote())
 								 .tag(request.getTag())
+								 .user(user)
 								 .build();
 		expenseRepository.save(expense);
 		log.info("expense {} is saved.", expense.getId());
@@ -75,6 +93,11 @@ public class ExpenseService {
 	public ExpenseResponse findById(Long id) throws ExpenseNotFoundException
 	{
 		return toExpenseResponse(findExpenseById(id));
+	}
+
+	public List<ExpenseResponse> findAll(ExpenseListRequest request)
+	{
+		return new ArrayList<>();
 	}
 
 	private ExpenseResponse toExpenseResponse(Expense expense)

@@ -4,6 +4,7 @@ package ir.expense.tracker.makharej.service;
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
 import ir.expense.tracker.makharej.common.exception.DuplicateCategoryException;
 import ir.expense.tracker.makharej.common.exception.ExpenseNotFoundException;
+import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
 import ir.expense.tracker.makharej.dto.category.CategoryRequest;
 import ir.expense.tracker.makharej.dto.expense.ExpenseRequest;
@@ -30,20 +31,12 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MockitoExtension.class)
 public class ExpenseServiceTest {
 
-	@Test
-	public void findByIdNotFound() throws ExpenseNotFoundException {
-
-		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
-
-		Assertions.assertThatThrownBy(() -> {
-			expenseService.findById(123l);
-		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
-	}
 	@Mock
 	private ExpenseRepository expenseRepository;
-
 	@Mock
 	private CategoryService categoryService;
+	@Mock
+	private UserService userService;
 
 	private ExpenseService expenseService;
 	private Date expenseDate = Calendar.getInstance().getTime();
@@ -58,11 +51,11 @@ public class ExpenseServiceTest {
 	@BeforeEach
 	public void setup()
 	{
-		expenseService = new ExpenseService(expenseRepository, categoryService);
+		expenseService = new ExpenseService(expenseRepository, categoryService, userService);
 	}
 
 	@Test
-	public void createExpenseOk() throws CategoryNotFoundException {
+	public void createExpenseOk() throws CategoryNotFoundException, UserNotFoundException {
 
 		ExpenseRequest request = ExpenseRequest.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).categoryId(categoryId).build();
 		Category category = Category.builder().name("sampleCategoryName").build();
@@ -167,5 +160,15 @@ public class ExpenseServiceTest {
 		Assertions.assertThat(categoryId).isEqualTo(expenseResponse.getCategoryId());
 		Assertions.assertThat(amount).isEqualTo(expenseResponse.getAmount());
 
+	}
+
+	@Test
+	public void findByIdNotFound() throws ExpenseNotFoundException {
+
+		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
+
+		Assertions.assertThatThrownBy(() -> {
+			expenseService.findById(123l);
+		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
 	}
 }
