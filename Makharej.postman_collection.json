@@ -1,0 +1,296 @@
+{
+	"info": {
+		"_postman_id": "52fe3037-40fa-4d68-822d-7486adcff48b",
+		"name": "Makharej",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "2408466"
+	},
+	"item": [
+		{
+			"name": "CreateCategory",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJob2oiLCJpYXQiOjE2ODMxMTMzMzQsImV4cCI6MTY4MzEyMDUzNH0.TqLYvzwQUFVAyuz_oL4VRkczWpxaUPKjUBAm121M_71sFrC9BJwmGHh9VaomArwb_dO7IOXWclwfJZtbJn1FCQ",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"name\" : \"category1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8081/api/category",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"api",
+						"category"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateExpense",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJob2oiLCJpYXQiOjE2ODMxMTMzMzQsImV4cCI6MTY4MzEyMDUzNH0.TqLYvzwQUFVAyuz_oL4VRkczWpxaUPKjUBAm121M_71sFrC9BJwmGHh9VaomArwb_dO7IOXWclwfJZtbJn1FCQ",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"name\" : \"hojjat-expense-4\"\r\n    , \"amount\" : \"1000\"\r\n    , \"expenseDate\" : \"2021-02-01 15:20:12\"\r\n    , \"categoryId\" : \"45\"\r\n    , \"tag\" : \"#daily\"\r\n    , \"note\" : \"my tenth daily expense\"\r\n\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8081/api/expense",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"api",
+						"expense"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "SearchExpense",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJob2oiLCJpYXQiOjE2ODMxMjkwMzcsImV4cCI6MTY4MzEzNjIzN30.B1SZ83OYqhR3NMzCrJ845VIw_PjMzEZOdRsaQA2D1myiD7yjgagVUGqzWKUAmdxH8Yd3vEQFKlDmNytgxNnXRQ",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"fromDate\" : \"2020-01-01 01:01:01\"\r\n    , \"toDate\" : \"2023-01-01 01:01:01\"\r\n    , \"categoryId\" : 45\r\n    , \"name\" : \"hojjat\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8081/api/expense/find",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"api",
+						"expense",
+						"find"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\" : \"hoj\"\r\n    , \"password\" : \"12345\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8081/api/auth/login",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UpdateCategory",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJob2pqYXQiLCJpYXQiOjE2ODMxMDk3MTEsImV4cCI6MTY4MzExNjkxMX0.McX9GvrecYBJmRp8uV3qDnj9sxHOmCjQBl_bLY74VeLbrLfZOlpvn09VMUQYB6NGqLRagMikDhULS1SvP18WOA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"name\" : \"category1-1\"\r\n    , \"id\": 43\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8081/api/category",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"api",
+						"category"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "FindAll",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJob2oiLCJpYXQiOjE2ODMxMjkwMzcsImV4cCI6MTY4MzEzNjIzN30.B1SZ83OYqhR3NMzCrJ845VIw_PjMzEZOdRsaQA2D1myiD7yjgagVUGqzWKUAmdxH8Yd3vEQFKlDmNytgxNnXRQ",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"name\" : \"cat\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8081/api/category/find",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"api",
+						"category",
+						"find"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Singup",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\" : \"hoj\"\r\n    , \"password\" : \"12345\"\r\n    , \"name\" : \"hoj sadeghi\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8081/api/auth/signup",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"api",
+						"auth",
+						"signup"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "FindById",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJob2pqYXQiLCJpYXQiOjE2ODMxMDk3MTEsImV4cCI6MTY4MzExNjkxMX0.McX9GvrecYBJmRp8uV3qDnj9sxHOmCjQBl_bLY74VeLbrLfZOlpvn09VMUQYB6NGqLRagMikDhULS1SvP18WOA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:8081/api/category/?id=43",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"api",
+						"category",
+						""
+					],
+					"query": [
+						{
+							"key": "id",
+							"value": "43"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

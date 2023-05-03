@@ -22,7 +22,6 @@ public class SecurityConfig {
 
 	@Autowired
 	UserDetailServiceImpl userDetailsService;
-
 	@Bean
 	public AuthenticationTokenFilter authenticationJwtTokenFilter() {
 		return new AuthenticationTokenFilter();

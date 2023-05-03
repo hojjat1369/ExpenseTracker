@@ -9,6 +9,7 @@ import ir.expense.tracker.makharej.dto.category.CategoryRequest;
 import ir.expense.tracker.makharej.dto.category.CategoryResponse;
 import ir.expense.tracker.makharej.dto.category.CategoryUpdateRequest;
 import ir.expense.tracker.makharej.entity.Category;
+import ir.expense.tracker.makharej.entity.User;
 import ir.expense.tracker.makharej.repository.CategoryRepository;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,17 +32,22 @@ public class CategoryServiceTest {
 	private CategoryService categoryService;
 	private CategoryRequest categoryRequest;
 
+	private final Long userId = 333L;
+
+	private User user;
+
 	@BeforeEach
 	public void setup()
 	{
 		categoryService = new CategoryService(categoryRepository, userService);
 		categoryRequest = CategoryRequest.builder().name("categoryName").build();
+		categoryRequest.setUserId(userId);
+		user = User.builder().username("testUsername").name("testName").build();
 	}
 
 	@Test
 	public void createCategoryWithDuplicateName() throws DuplicateCategoryException {
-		Category category = Category.builder().name(categoryRequest.getName()).build();
-		Mockito.when(categoryRepository.findByNameAndUserId(Mockito.any(), Mockito.any())).thenReturn(Category.builder().name(categoryRequest.getName()).build());
+		Mockito.when(categoryRepository.findByNameAndUserId(categoryRequest.getName(), categoryRequest.getUserId())).thenReturn(Category.builder().name(categoryRequest.getName()).user(user).build());
 
 		Assertions.assertThatThrownBy(() -> {
 			categoryService.createCategory(categoryRequest);
@@ -50,9 +56,10 @@ public class CategoryServiceTest {
 
 	@Test
 	public void createCategoryOk() throws DuplicateCategoryException, UserNotFoundException {
-		Category category = Category.builder().name(categoryRequest.getName()).build();
+		Category category = Category.builder().name(categoryRequest.getName()).user(user).build();
 		Mockito.when(categoryRepository.save(Mockito.any())).thenReturn(category);
-		Mockito.when(categoryRepository.findByNameAndUserId(categoryRequest.getName(), Mockito.any())).thenReturn(null);
+		Mockito.when(categoryRepository.findByNameAndUserId(categoryRequest.getName(), userId)).thenReturn(null);
+		Mockito.when(userService.findUserById(userId)).thenReturn(user);
 
 		CategoryResponse categoryResponse = categoryService.createCategory(categoryRequest);
 
@@ -62,19 +69,19 @@ public class CategoryServiceTest {
 	@Test
 	public void findCategoryByIdOk() throws CategoryNotFoundException {
 		Category category = Category.builder().name(categoryRequest.getName()).build();
-		Mockito.when(categoryRepository.findById(123l)).thenReturn(Optional.of(category));
+		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.of(category));
 
-		Category categoryById = categoryService.findCategoryById(123l);
+		Category categoryById = categoryService.findCategoryById(123L);
 
 		Assertions.assertThat(categoryById.getName()).isEqualTo(category.getName());
 	}
 
 	@Test
 	public void findCategoryByIdNotFound() throws CategoryNotFoundException {
-		Mockito.when(categoryRepository.findById(123l)).thenReturn(Optional.ofNullable(null));
+		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
 
 		Assertions.assertThatThrownBy(() -> {
-			categoryService.findCategoryById(123l);
+			categoryService.findCategoryById(123L);
 		}).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
 
 	}
@@ -82,8 +89,8 @@ public class CategoryServiceTest {
 	@Test
 	public void updateCategoryIdNotFound() throws CategoryNotFoundException {
 
-		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123l).name("updatedCategoryName").build();
-		Mockito.when(categoryRepository.findById(123l)).thenReturn(Optional.ofNullable(null));
+		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123L).name("updatedCategoryName").build();
+		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
 
 		Assertions.assertThatThrownBy(() -> {
 			categoryService.updateCategory(request);
@@ -95,8 +102,8 @@ public class CategoryServiceTest {
 	public void updateCategoryOk() throws CategoryNotFoundException {
 
 		Category category = Category.builder().name(categoryRequest.getName()).build();
-		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123l).name("updatedCategoryName").build();
-		Mockito.when(categoryRepository.findById(123l)).thenReturn(Optional.ofNullable(category));
+		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123L).name("updatedCategoryName").build();
+		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(category));
 
 		CategoryResponse updatedCategory = categoryService.updateCategory(request);
 		Assertions.assertThat(updatedCategory.getName()).isEqualTo(category.getName());
@@ -106,10 +113,10 @@ public class CategoryServiceTest {
 	@Test
 	public void deleteCategoryIdNotFound() throws CategoryNotFoundException {
 
-		Mockito.when(categoryRepository.findById(123l)).thenReturn(Optional.ofNullable(null));
+		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
 
 		Assertions.assertThatThrownBy(() -> {
-			categoryService.deleteCategory(123l);
+			categoryService.deleteCategory(123L);
 		}).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
 
 	}
@@ -118,9 +125,9 @@ public class CategoryServiceTest {
 	public void deleteCategoryOk() throws CategoryNotFoundException {
 
 		Category category = Category.builder().name(categoryRequest.getName()).build();
-		Mockito.when(categoryRepository.findById(123l)).thenReturn(Optional.ofNullable(category));
+		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(category));
 
-		CategoryResponse deletedCategory = categoryService.deleteCategory(123l);
+		CategoryResponse deletedCategory = categoryService.deleteCategory(123L);
 		Assertions.assertThat(deletedCategory.getName()).isEqualTo(category.getName());
 
 	}

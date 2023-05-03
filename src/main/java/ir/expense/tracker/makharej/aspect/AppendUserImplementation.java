@@ -28,7 +28,7 @@ import java.lang.reflect.Method;
 @Aspect
 @Order(1)
 @RequiredArgsConstructor
-public class AppendUseImplementation {
+public class AppendUserImplementation {
 
 	@Autowired
 	private final JwtUtil jwtUtils;
@@ -64,27 +64,6 @@ public class AppendUseImplementation {
 		}
 	}
 
-	private String getAuthorizationFromHeader(ProceedingJoinPoint joinPoint) {
-
-		MethodSignature methodSignature = (MethodSignature) joinPoint.getStaticPart().getSignature();
-		Method method = methodSignature.getMethod();
-		return getAuthorizationHeader(method, joinPoint.getArgs());
-	}
-
-	public static String getAuthorizationHeader(Method method, Object[] parameters) {
-
-		Annotation[][] methodAnnotations = method.getParameterAnnotations();
-
-		if (methodAnnotations != null){
-			for (int i = 0; i < methodAnnotations.length; i++){
-				if (methodAnnotations[i].length > 0 && (methodAnnotations[i][0].annotationType().equals(RequestHeader.class))){
-					return (String) parameters[i];
-				}
-			}
-		}
-		return null;
-	}
-
 	private Userable getUserableInput(ProceedingJoinPoint joinPoint) {
 
 		Userable userable = null;
@@ -96,16 +75,6 @@ public class AppendUseImplementation {
 			}
 		}
 		return userable;
-	}
-
-	private boolean hasAuthorizationBearer(String header) {
-
-		return (header != null && !header.isEmpty() && header.startsWith("Bearer"));
-	}
-
-	private String getAccessToken(String header) {
-
-		return header.split(" ")[1].trim();
 	}
 
 	private String parseJwt() {

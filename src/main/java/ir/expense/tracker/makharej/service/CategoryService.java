@@ -34,11 +34,11 @@ public class CategoryService {
 	public CategoryResponse createCategory(@Valid @NotNull CategoryRequest request) throws DuplicateCategoryException, UserNotFoundException {
 
 		Category categoryByName = findCategoryByNameAndUserId(request.getName(), request.getUserId());
-		User user = userService.findUserById(request.getUserId());
 		if(categoryByName != null)
 		{
 			throw new DuplicateCategoryException();
 		}
+		User user = userService.findUserById(request.getUserId());
 		Category category = Category.builder().name(request.getName()).user(user).build();
 		categoryRepository.save(category);
 		log.info("category {} is saved.", category.getId());

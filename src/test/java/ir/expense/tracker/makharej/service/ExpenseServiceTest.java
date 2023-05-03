@@ -12,6 +12,7 @@ import ir.expense.tracker.makharej.dto.expense.ExpenseResponse;
 import ir.expense.tracker.makharej.dto.expense.ExpenseUpdateRequest;
 import ir.expense.tracker.makharej.entity.Category;
 import ir.expense.tracker.makharej.entity.Expense;
+import ir.expense.tracker.makharej.entity.User;
 import ir.expense.tracker.makharej.repository.CategoryRepository;
 import ir.expense.tracker.makharej.repository.ExpenseRepository;
 import ir.expense.tracker.makharej.repository.ExpenseRepositoryImpl;
@@ -39,35 +40,36 @@ public class ExpenseServiceTest {
 	@Mock
 	private UserService userService;
 
-	@Mock
-	private ExpenseRepositoryImpl expenseRepositoryImpl;
-
 	private ExpenseService expenseService;
-	private Date expenseDate = Calendar.getInstance().getTime();
-	private Double amount = 5000.0;
-	private String tag = "sampleExpenseTag";
-	private String note = "sampleExpenseNote";
-	private String name = "sampleExpenseName";
-	private Long categoryId = 123l;
-
-	private Long expenseId = 123l;
+	private final Date expenseDate = Calendar.getInstance().getTime();
+	private final Double amount = 5000.0;
+	private final String tag = "sampleExpenseTag";
+	private final String note = "sampleExpenseNote";
+	private final String name = "sampleExpenseName";
+	private final Long categoryId = 123L;
+	private final Long expenseId = 123L;
+	private final Long userId=123L;
+	private User user;
 
 	@BeforeEach
 	public void setup()
 	{
-		expenseService = new ExpenseService(expenseRepository, categoryService, userService, expenseRepositoryImpl);
+		expenseService = new ExpenseService(expenseRepository, categoryService, userService);
+		user = User.builder().name("testName").username("testUsername").build();
 	}
 
 	@Test
 	public void createExpenseOk() throws CategoryNotFoundException, UserNotFoundException {
 
 		ExpenseRequest request = ExpenseRequest.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).categoryId(categoryId).build();
-		Category category = Category.builder().name("sampleCategoryName").build();
+		request.setUserId(userId);
+		Category category = Category.builder().name("sampleCategoryName").user(user).build();
 		category.setId(categoryId);
 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
 
-		Mockito.when(categoryService.findCategoryById(categoryId)).thenReturn(category);
+		Mockito.when(categoryService.findCategoryByIdAndUserId(categoryId, userId)).thenReturn(category);
 		Mockito.when(expenseRepository.save(Mockito.any())).thenReturn(expense);
+		Mockito.when(userService.findUserById(Mockito.anyLong())).thenReturn(user);
 
 		ExpenseResponse expenseResponse = expenseService.createExpense(request);
 
@@ -126,7 +128,7 @@ public class ExpenseServiceTest {
 		Mockito.when(expenseRepository.save(Mockito.any())).thenReturn(expense);
 		Mockito.when(expenseRepository.findById(expenseId)).thenReturn(Optional.ofNullable(expense));
 
-		ExpenseResponse expenseResponse = expenseService.deleteExpense(123l);
+		ExpenseResponse expenseResponse = expenseService.deleteExpense(123L);
 
 		Assertions.assertThat(name).isEqualTo(expenseResponse.getName());
 		Assertions.assertThat(note).isEqualTo(expenseResponse.getNote());
@@ -142,7 +144,7 @@ public class ExpenseServiceTest {
 		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
 
 		Assertions.assertThatThrownBy(() -> {
-			expenseService.deleteExpense(123l);
+			expenseService.deleteExpense(123L);
 		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
 	}
 
@@ -155,7 +157,7 @@ public class ExpenseServiceTest {
 
 		Mockito.when(expenseRepository.findById(expenseId)).thenReturn(Optional.ofNullable(expense));
 
-		ExpenseResponse expenseResponse = expenseService.findById(123l);
+		ExpenseResponse expenseResponse = expenseService.findById(123L);
 
 		Assertions.assertThat(name).isEqualTo(expenseResponse.getName());
 		Assertions.assertThat(note).isEqualTo(expenseResponse.getNote());
@@ -172,7 +174,7 @@ public class ExpenseServiceTest {
 		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
 
 		Assertions.assertThatThrownBy(() -> {
-			expenseService.findById(123l);
+			expenseService.findById(123L);
 		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
 	}
 }

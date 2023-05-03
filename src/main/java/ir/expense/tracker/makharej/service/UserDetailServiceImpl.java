@@ -1,10 +1,7 @@
 package ir.expense.tracker.makharej.service;
 
 
-import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
-import ir.expense.tracker.makharej.dto.user.UserRequest;
-import ir.expense.tracker.makharej.dto.user.UserResponse;
 import ir.expense.tracker.makharej.entity.User;
 import ir.expense.tracker.makharej.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,13 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
 import java.util.ArrayList;
-import java.util.List;
 
 
 @Service
