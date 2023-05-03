@@ -35,7 +35,9 @@ cd expenseTracker
 
 ### Building / Deploying
 
-To run this project after getting source code, simple go to ir.expense.tracker.makharej package and open MakharejApplication.java and run main method
+To run this project after getting source code, simple go to ir.expense.tracker.makharej package and open MakharejApplication.java and run main method.
+
+* If you open application.yml file you can see database configuraion with local url so if you want to run this project you must change this config to your local database.
 
 ## Features
 
