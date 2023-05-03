@@ -28,7 +28,7 @@ public class ExpenseRequest extends Userable {
 	private String tag;
 	private String note;
 
-	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern= "yyyy-MM-dd HH:mm:ss", locale = "Asia/Tehran")
+	@JsonFormat(pattern= "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Tehran")
 	@NotNull(message = ErrorMessages.DATE_CANNOT_BE_NULL)
 	private Date expenseDate;
 
