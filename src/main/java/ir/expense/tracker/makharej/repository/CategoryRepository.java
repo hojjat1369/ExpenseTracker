@@ -13,7 +13,9 @@ import java.util.List;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-	@Query("Select c from Category c where c.name like :name")
-	public List<Category> findByNameContaining(@Param("name") String name);
-	public Category findByName(String name);
+	@Query("Select c from Category c where c.name like :name and c.user.id=:userId")
+	public List<Category> findByNameContainingAndUserId(@Param("name") String name, @Param("userId") Long userId);
+
+	@Query("Select c from Category c where c.name=:name and c.user.id=:userId")
+	public Category findByNameAndUserId(@Param("name") String name, @Param("userId") Long userId);
 }

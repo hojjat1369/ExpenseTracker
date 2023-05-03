@@ -4,6 +4,7 @@ package ir.expense.tracker.makharej.controller;
 import ir.expense.tracker.makharej.aspect.AppendUser;
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
 import ir.expense.tracker.makharej.common.exception.DuplicateCategoryException;
+import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
 import ir.expense.tracker.makharej.dto.category.CategoryListRequest;
 import ir.expense.tracker.makharej.dto.category.CategoryRequest;
 import ir.expense.tracker.makharej.dto.category.CategoryResponse;
@@ -30,7 +31,7 @@ public class CategoryController {
 	@ResponseStatus(HttpStatus.CREATED)
 	@ResponseBody
 	@AppendUser
-	public CategoryResponse createCategory(@Valid @RequestBody CategoryRequest categoryRequest) throws DuplicateCategoryException {
+	public CategoryResponse createCategory(@Valid @RequestBody CategoryRequest categoryRequest) throws DuplicateCategoryException, UserNotFoundException {
 
 		return categoryService.createCategory(categoryRequest);
 	}
@@ -52,6 +53,7 @@ public class CategoryController {
 
 	@GetMapping(path = "/find")
 	@ResponseStatus(HttpStatus.OK)
+	@AppendUser
 	@ResponseBody
 	public List<CategoryResponse> findCategories(@RequestParam CategoryListRequest categoryListRequest) throws CategoryNotFoundException {
 

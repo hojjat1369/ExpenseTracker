@@ -2,6 +2,7 @@ package ir.expense.tracker.makharej.dto.category;
 
 
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
+import ir.expense.tracker.makharej.dto.user.Userable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

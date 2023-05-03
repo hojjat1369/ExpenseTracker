@@ -3,6 +3,7 @@ package ir.expense.tracker.makharej.service;
 
 import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
 import ir.expense.tracker.makharej.common.exception.DuplicateCategoryException;
+import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
 import ir.expense.tracker.makharej.dto.category.CategoryRequest;
 import ir.expense.tracker.makharej.dto.category.CategoryResponse;
@@ -25,20 +26,22 @@ public class CategoryServiceTest {
 
 	@Mock
 	private CategoryRepository categoryRepository;
+	@Mock
+	private UserService userService;
 	private CategoryService categoryService;
 	private CategoryRequest categoryRequest;
 
 	@BeforeEach
 	public void setup()
 	{
-		categoryService = new CategoryService(categoryRepository);
+		categoryService = new CategoryService(categoryRepository, userService);
 		categoryRequest = CategoryRequest.builder().name("categoryName").build();
 	}
 
 	@Test
 	public void createCategoryWithDuplicateName() throws DuplicateCategoryException {
 		Category category = Category.builder().name(categoryRequest.getName()).build();
-		Mockito.when(categoryRepository.findByName(Mockito.any())).thenReturn(Category.builder().name(categoryRequest.getName()).build());
+		Mockito.when(categoryRepository.findByNameAndUserId(Mockito.any(), Mockito.any())).thenReturn(Category.builder().name(categoryRequest.getName()).build());
 
 		Assertions.assertThatThrownBy(() -> {
 			categoryService.createCategory(categoryRequest);
@@ -46,10 +49,10 @@ public class CategoryServiceTest {
 	}
 
 	@Test
-	public void createCategoryOk() throws DuplicateCategoryException {
+	public void createCategoryOk() throws DuplicateCategoryException, UserNotFoundException {
 		Category category = Category.builder().name(categoryRequest.getName()).build();
 		Mockito.when(categoryRepository.save(Mockito.any())).thenReturn(category);
-		Mockito.when(categoryRepository.findByName(categoryRequest.getName())).thenReturn(null);
+		Mockito.when(categoryRepository.findByNameAndUserId(categoryRequest.getName(), Mockito.any())).thenReturn(null);
 
 		CategoryResponse categoryResponse = categoryService.createCategory(categoryRequest);
 
