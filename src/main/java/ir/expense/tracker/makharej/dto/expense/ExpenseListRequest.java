@@ -22,10 +22,9 @@ public class ExpenseListRequest extends Userable {
 
 	private String name;
 	private String tag;
-
-	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonFormat(pattern= "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Tehran")
 	private Date fromDate;
-	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonFormat(pattern= "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Tehran")
 	private Date toDate;
 
 	private Long categoryId;

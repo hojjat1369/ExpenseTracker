@@ -19,6 +19,7 @@ import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @Repository
@@ -37,11 +38,27 @@ public class ExpenseRepositoryImpl implements ExpenseRepositoryCustom{
 		List<Predicate> predicates = new ArrayList<>();
 		if(StringUtils.hasText(request.getName()))
 		{
-			predicates.add(criteriaBuilder.equal(expenseRoot.get("name"), request.getName()));
+			predicates.add(criteriaBuilder.like(expenseRoot.get("name"),  "%" + request.getName() + "%"));
 		}
 		if(request.getUserId() != null)
 		{
 			predicates.add(criteriaBuilder.equal(expenseRoot.get("user").get("id"), request.getUserId()));
+		}
+		if(StringUtils.hasText(request.getTag()))
+		{
+			predicates.add(criteriaBuilder.like(expenseRoot.get("tag"), "%" + request.getTag() + "%"));
+		}
+		if(request.getCategoryId() != null)
+		{
+			predicates.add(criteriaBuilder.equal(expenseRoot.get("category").get("id"), request.getCategoryId()));
+		}
+		if(request.getFromDate() != null)
+		{
+			predicates.add(criteriaBuilder.greaterThanOrEqualTo(expenseRoot.<Date>get("expenseDate"), request.getFromDate()));
+		}
+		if(request.getToDate() != null)
+		{
+			predicates.add(criteriaBuilder.lessThanOrEqualTo(expenseRoot.<Date>get("expenseDate"), request.getToDate()));
 		}
 
 		query.where(predicates.toArray(new Predicate[0]));
