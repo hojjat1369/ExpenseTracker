@@ -51,13 +51,13 @@ public class CategoryController {
 		return categoryService.findById(id);
 	}
 
-	@GetMapping(path = "/find")
+	@PostMapping(path = "/find")
 	@ResponseStatus(HttpStatus.OK)
 	@AppendUser
 	@ResponseBody
-	public List<CategoryResponse> findCategories(@RequestParam CategoryListRequest categoryListRequest) throws CategoryNotFoundException {
+	public List<CategoryResponse> findCategories(@Valid @RequestBody CategoryListRequest request) throws CategoryNotFoundException {
 
-		return categoryService.find(categoryListRequest);
+		return categoryService.find(request);
 	}
 
 	@DeleteMapping

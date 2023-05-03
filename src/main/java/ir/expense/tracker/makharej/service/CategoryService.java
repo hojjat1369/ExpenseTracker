@@ -57,7 +57,7 @@ public class CategoryService {
 	public List<CategoryResponse> find(@NotNull CategoryListRequest categoryListRequest) {
 
 		List<Category> categories = categoryRepository.findByNameContainingAndUserId(categoryListRequest.getName(), categoryListRequest.getUserId());
-		return categories.stream().map(this::toCategoryResponse).collect(Collectors.toList());
+		return categories.stream().map(this	::toCategoryResponse).collect(Collectors.toList());
 	}
 
 	public CategoryResponse deleteCategory(Long id) throws CategoryNotFoundException {
