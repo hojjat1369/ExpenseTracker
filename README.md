@@ -139,7 +139,7 @@ Create a expense for logged in user with given name and other attributes for sel
 
 ```bash
 Post
-URI: /api/category
+URI: /api/expense
 {
   "amount": 0,
   "categoryId": 0,
@@ -152,12 +152,39 @@ Response:
 {
   "amount": 0,
   "categoryId": 0,
-  "expenseDate": "2023-05-03T15:33:31.055Z",
+  "expenseDate": "2023-05-03 11:11:11",
   "id": 0,
   "name": "string",
   "note": "string",
   "tag": "string"
 }
+```
+
+#### Search Expenses
+Search expenses based on date (fromDate, toDate), name(like), tag(like), category. Response is a list of searched Expenses. 
+
+```bash
+Post
+URI: /api/expense/find
+{
+  "categoryId": 0,
+  "fromDate": "2021-05-03 11:11:11",
+  "name": "string",
+  "tag": "string",
+  "toDate": "2023-05-03 11:11:11"
+}
+Response:
+[
+  {
+    "amount": 0,
+    "categoryId": 0,
+    "expenseDate": "2022-05-03 11:11:11",
+    "id": 0,
+    "name": "string",
+    "note": "string",
+    "tag": "string"
+  }
+]
 ```
 
 
