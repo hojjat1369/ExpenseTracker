@@ -16,9 +16,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import javax.transaction.Transactional;
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
+import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 
@@ -57,16 +57,18 @@ public class ExpenseService {
 		return toExpenseResponse(expense);
 	}
 
-	public ExpenseResponse updateExpense(@Valid @NotNull ExpenseUpdateRequest request) throws ExpenseNotFoundException, CategoryNotFoundException {
+	public ExpenseResponse updateExpense(@Valid @NotNull ExpenseUpdateRequest request, Long userId) throws ExpenseNotFoundException, CategoryNotFoundException {
 
-		Expense expense = findExpenseById(request.getId());
+		Expense expense = findExpenseById(request.getId(), userId);
 		expense.setName(expense.getName());
-		expense.setExpenseDate(request.getExpenseDate());
+		if(request.getExpenseDate() != null){
+			expense.setExpenseDate(request.getExpenseDate());
+		}
 		expense.setNote(request.getNote());
 		expense.setTag(request.getTag());
 		expense.setAmount(request.getAmount());
 		if(request.getCategoryId() != null){
-			Category category = categoryService.findCategoryById(request.getCategoryId());
+			Category category = categoryService.findCategoryById(request.getCategoryId(), userId);
 			expense.setCategory(category);
 		}
 		expenseRepository.save(expense);
@@ -74,23 +76,31 @@ public class ExpenseService {
 		return toExpenseResponse(expense);
 	}
 
-	public ExpenseResponse deleteExpense(Long id) throws ExpenseNotFoundException {
+	public ExpenseResponse deleteExpense(Long id, Long userId) throws ExpenseNotFoundException {
 
-		Expense expense = findExpenseById(id);
+		Expense expense = findExpenseById(id, userId);
 		expense.setEnable(null);
 		expenseRepository.save(expense);
 		log.info("expense {} is deleted.", expense.getId());
 		return toExpenseResponse(expense);
 	}
 
-	public Expense findExpenseById(Long id) throws ExpenseNotFoundException
+	/**
+	 * Finds an expense of the given user. An expense that belongs to somebody else is reported as not found.
+	 */
+	public Expense findExpenseById(Long id, Long userId) throws ExpenseNotFoundException
 	{
-		return expenseRepository.findById(id).orElseThrow(ExpenseNotFoundException::new);
+		Expense expense = userId == null ? null : expenseRepository.findByIdAndUserId(id, userId);
+		if(expense == null)
+		{
+			throw new ExpenseNotFoundException();
+		}
+		return expense;
 	}
 
-	public ExpenseResponse findById(Long id) throws ExpenseNotFoundException
+	public ExpenseResponse findById(Long id, Long userId) throws ExpenseNotFoundException
 	{
-		return toExpenseResponse(findExpenseById(id));
+		return toExpenseResponse(findExpenseById(id, userId));
 	}
 
 	public List<ExpenseResponse> findAll(ExpenseListRequest request)

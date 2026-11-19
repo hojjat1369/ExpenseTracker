@@ -1,0 +1,4347 @@
+diff --git a/README.md b/README.md
+index 6bf0a95..0ef35ad 100644
+--- a/README.md
++++ b/README.md
+@@ -9,7 +9,6 @@ TODO:
+ * Add more unit tests
+ * Add integration tests
+ * Dokerise the project
+-* Add Trigger entity to project
+ 
+ ## Getting started
+ 
+@@ -19,8 +18,8 @@ This Expense Tracker provides simple APIs to work with different types of expens
+ * Signup/Login/Get data about your user.
+ * Ceate/Update/Delete/Get/Search differnt tpyes of Categories for yourself.
+ * Create/Update/Delete/Get/Search you expenses based of different categories that you created before.
+-* TODO: Create different monthly/yearly Reports based on filters that you provide.
+-* TODO: Create different Triggers to alarm for things like, “spending too much money on coffee… as always..
++* Get monthly/yearly Reports of your expenses, based on filters that you provide.
++* Create Triggers to alarm for things like, “spending too much money on coffee… as always..
+ ```
+ 
+ ## Developing
+@@ -35,6 +34,8 @@ cd expenseTracker
+ 
+ ### Building / Deploying
+ 
++This project needs Java 21 and builds with Spring Boot 3 (`mvn package`).
++
+ To run this project after getting source code, simple go to ir.expense.tracker.makharej package and open MakharejApplication.java and run main method.
+ 
+ * If you open application.yml file you can see database configuraion with local url so if you want to run this project you must change this config to your local database.
+@@ -44,8 +45,8 @@ To run this project after getting source code, simple go to ir.expense.tracker.m
+ * Signup/Login/Get data about your user.
+ * Ceate/Update/Delete/Get/Search differnt tpyes of Categories for yourself.
+ * Create/Update/Delete/Get/Search you expenses based of different categories that you created before.
+-* TODO: Create different monthly/yearly Reports based on filters that you provide.
+-* TODO: Create different Triggers to alarm for things like, “spending too much money on coffee… as always..
++* Get monthly/yearly Reports of your expenses, based on filters that you provide.
++* Create Triggers to alarm for things like, “spending too much money on coffee… as always..
+ 
+ Below I explained about important webservies:
+ 
+@@ -196,12 +197,81 @@ Response:
+ ]
+ ```
+ 
++#### Reports
++Monthly or yearly totals of your expenses. It takes the same filters as searching expenses (all of them optional), plus the `period`: `MONTH` or `YEAR`.
++
++```bash
++Post
++URI:/api/report
++Request:
++{
++  "period": "MONTH",
++  "categoryId": 0,
++  "fromDate": "2023-01-01 00:00:00",
++  "name": "string",
++  "tag": "string",
++  "toDate": "2023-12-31 23:59:59"
++}
++Response:
++{
++  "period": "MONTH",
++  "totalAmount": 170.5,
++  "count": 3,
++  "periods": [
++    { "period": "2023-01", "totalAmount": 150.5, "count": 2 },
++    { "period": "2023-02", "totalAmount": 0.0, "count": 0 },
++    { "period": "2023-03", "totalAmount": 20.0, "count": 1 }
++  ]
++}
++```
++
++* Periods are listed oldest first, and a period without expenses between the first and the last one is listed with zero. A year is labelled `2023`, a month `2023-05`.
++* Months and years are Gregorian calendar ones, counted in Tehran time (the time zone of the dates in this API).
++* Deleted expenses, and expenses without a date, are not part of a report.
++
++#### Triggers
++A trigger is a budget rule: *the expenses that match these filters add up to more than this limit within the current month (or year)*. Filters are optional (`expenseName` is part of an expense name, `tag` is part of a tag, `categoryId` is one of your categories).
++
++```bash
++Post
++URI:/api/trigger
++Request:
++{
++  "name": "too much coffee",
++  "period": "MONTH",
++  "limit": 50,
++  "tag": "coffee",
++  "expenseName": "string",
++  "categoryId": 0
++}
++Response:
++{
++  "id": 0,
++  "name": "too much coffee",
++  "period": "MONTH",
++  "limit": 50.0,
++  "expenseName": null,
++  "tag": "coffee",
++  "categoryId": null,
++  "currentPeriod": "2023-05",
++  "currentAmount": 60.0,
++  "triggered": true
++}
++```
++
++* `GET /api/trigger?id=0` returns one trigger, `PATCH /api/trigger` replaces the rule of one (send all of it, plus the `id`), `DELETE /api/trigger?id=0` deletes one.
++* `POST /api/trigger/find` lists your triggers. The body is optional filters: `{"name": "coffee", "triggered": true}`. `"triggered": true` gives the alarms that are going off right now.
++* Nothing is pushed to you (no e-mail, no notification): the alarm is `triggered`, worked out each time you read a trigger.
++* `currentAmount` is what the matching expenses add up to in the current month or year (Tehran time, like the reports), and `triggered` is true when it is more than `limit`.
++
+ 
+ ## Links
+ 
+ For documentaion about APIs, after running this app, you can visit:
+ 
+-SwaggerUrl: http://localhost:8081/swagger-ui.html#/
++SwaggerUrl: http://localhost:8081/swagger-ui.html
++
++The OpenAPI description is served at http://localhost:8081/v3/api-docs
+ 
+ 
+ ## Licensing
+diff --git a/pom.xml b/pom.xml
+index 6553009..4fc566a 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -5,7 +5,7 @@
+ 	<parent>
+ 		<groupId>org.springframework.boot</groupId>
+ 		<artifactId>spring-boot-starter-parent</artifactId>
+-		<version>2.7.11</version>
++		<version>3.5.16</version>
+ 		<relativePath/> <!-- lookup parent from repository -->
+ 	</parent>
+ 	<groupId>ir.expense.tracker</groupId>
+@@ -14,7 +14,7 @@
+ 	<name>makharej</name>
+ 	<description>Expense Tracker</description>
+ 	<properties>
+-		<java.version>17</java.version>
++		<java.version>21</java.version>
+ 	</properties>
+ 
+ 	<profiles>
+@@ -25,7 +25,6 @@
+ 					<plugin>
+ 						<groupId>org.apache.maven.plugins</groupId>
+ 						<artifactId>maven-surefire-plugin</artifactId>
+-						<version>2.22.2</version>
+ 						<configuration>
+ 							<systemPropertyVariables>
+ 								<profileId>test</profileId>
+@@ -50,6 +49,12 @@
+ 			<groupId>org.springframework.boot</groupId>
+ 			<artifactId>spring-boot-starter-web</artifactId>
+ 		</dependency>
++		<!-- AppendUserImplementation uses AspectJ directly. spring-boot-starter-data-jpa used to depend on
++		     spring-boot-starter-aop (Boot 2.7); it no longer does, so declare it instead of relying on spring-aspects -->
++		<dependency>
++			<groupId>org.springframework.boot</groupId>
++			<artifactId>spring-boot-starter-aop</artifactId>
++		</dependency>
+ 		<dependency>
+ 			<groupId>org.springframework.boot</groupId>
+ 			<artifactId>spring-boot-starter-security</artifactId>
+@@ -91,17 +96,18 @@
+ 			<artifactId>jjwt</artifactId>
+ 			<version>0.9.1</version>
+ 		</dependency>
+-
++		<!-- jjwt 0.9.1 uses javax.xml.bind.DatatypeConverter (removed from the JDK in 11). spring-boot-starter-data-jpa
++		     used to bring jaxb-api in transitively (Boot 2.7); Boot 3 only has the jakarta.xml.bind namespace.
++		     Without this, every login fails with NoClassDefFoundError. -->
+ 		<dependency>
+-			<groupId>javax.validation</groupId>
+-			<artifactId>validation-api</artifactId>
+-			<version>2.0.1.Final</version>
++			<groupId>javax.xml.bind</groupId>
++			<artifactId>jaxb-api</artifactId>
++			<version>2.3.1</version>
+ 		</dependency>
+ 
+ 		<dependency>
+ 			<groupId>org.assertj</groupId>
+ 			<artifactId>assertj-core</artifactId>
+-			<version>3.24.2</version>
+ 			<scope>test</scope>
+ 		</dependency>
+ 
+@@ -114,30 +120,26 @@
+ 		<dependency>
+ 			<groupId>org.mockito</groupId>
+ 			<artifactId>mockito-core</artifactId>
+-			<version>5.2.0</version>
+ 			<scope>test</scope>
+ 		</dependency>
+ 
+ 		<dependency>
+-			<groupId>io.springfox</groupId>
+-			<artifactId>springfox-swagger2</artifactId>
+-			<version>2.9.2</version>
+-		</dependency>
+-		<dependency>
+-			<groupId>io.springfox</groupId>
+-			<artifactId>springfox-swagger-ui</artifactId>
+-			<version>2.9.2</version>
++			<groupId>org.springdoc</groupId>
++			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
++			<version>2.9.1</version>
+ 		</dependency>
+ 
+ 		<dependency>
+ 			<groupId>com.querydsl</groupId>
+ 			<artifactId>querydsl-apt</artifactId>
+ 			<version>5.0.0</version>
++			<classifier>jakarta</classifier>
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>com.querydsl</groupId>
+ 			<artifactId>querydsl-jpa</artifactId>
+ 			<version>5.0.0</version>
++			<classifier>jakarta</classifier>
+ 		</dependency>
+ 
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/ClockConfig.java b/src/main/java/ir/expense/tracker/makharej/ClockConfig.java
+new file mode 100644
+index 0000000..858af13
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/ClockConfig.java
+@@ -0,0 +1,19 @@
++package ir.expense.tracker.makharej;
++
++
++import ir.expense.tracker.makharej.service.ReportService;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++
++import java.time.Clock;
++
++
++@Configuration
++public class ClockConfig {
++
++	@Bean
++	public Clock clock() {
++
++		return Clock.system(ReportService.ZONE);
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/MakharejApplication.java b/src/main/java/ir/expense/tracker/makharej/MakharejApplication.java
+index 4a76e11..65998ec 100644
+--- a/src/main/java/ir/expense/tracker/makharej/MakharejApplication.java
++++ b/src/main/java/ir/expense/tracker/makharej/MakharejApplication.java
+@@ -5,11 +5,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
+ import org.springframework.context.annotation.Bean;
+ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+ import org.springframework.security.crypto.password.PasswordEncoder;
+-import springfox.documentation.swagger2.annotations.EnableSwagger2;
+ 
+ 
+ @SpringBootApplication
+-@EnableSwagger2
+ public class MakharejApplication {
+ 
+ 	public static void main(String[] args) {
+diff --git a/src/main/java/ir/expense/tracker/makharej/SwaggerConfig.java b/src/main/java/ir/expense/tracker/makharej/SwaggerConfig.java
+deleted file mode 100644
+index 02512ca..0000000
+--- a/src/main/java/ir/expense/tracker/makharej/SwaggerConfig.java
++++ /dev/null
+@@ -1,55 +0,0 @@
+-package ir.expense.tracker.makharej;
+-
+-
+-import org.springframework.boot.actuate.autoconfigure.endpoint.web.CorsEndpointProperties;
+-import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
+-import org.springframework.boot.actuate.autoconfigure.web.server.ManagementPortType;
+-import org.springframework.boot.actuate.endpoint.ExposableEndpoint;
+-import org.springframework.boot.actuate.endpoint.web.*;
+-import org.springframework.boot.actuate.endpoint.web.annotation.ControllerEndpointsSupplier;
+-import org.springframework.boot.actuate.endpoint.web.annotation.ServletEndpointsSupplier;
+-import org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping;
+-import org.springframework.context.annotation.Bean;
+-import org.springframework.context.annotation.Configuration;
+-import org.springframework.core.env.Environment;
+-import org.springframework.util.StringUtils;
+-import springfox.documentation.builders.PathSelectors;
+-import springfox.documentation.builders.RequestHandlerSelectors;
+-import springfox.documentation.spi.DocumentationType;
+-import springfox.documentation.spring.web.plugins.Docket;
+-
+-import java.util.ArrayList;
+-import java.util.Collection;
+-import java.util.List;
+-
+-
+-@Configuration
+-public class SwaggerConfig {
+-
+-	@Bean
+-	public Docket api() {
+-		return new Docket(DocumentationType.SWAGGER_2)
+-				.select()
+-				.apis(RequestHandlerSelectors.any())
+-				.paths(PathSelectors.any())
+-				.build();
+-	}
+-
+-	@Bean
+-	public WebMvcEndpointHandlerMapping webEndpointServletHandlerMapping(WebEndpointsSupplier webEndpointsSupplier, ServletEndpointsSupplier servletEndpointsSupplier, ControllerEndpointsSupplier controllerEndpointsSupplier, EndpointMediaTypes endpointMediaTypes, CorsEndpointProperties corsProperties, WebEndpointProperties webEndpointProperties, Environment environment) {
+-		List<ExposableEndpoint<?>> allEndpoints = new ArrayList<>();
+-		Collection<ExposableWebEndpoint> webEndpoints = webEndpointsSupplier.getEndpoints();
+-		allEndpoints.addAll(webEndpoints);
+-		allEndpoints.addAll(servletEndpointsSupplier.getEndpoints());
+-		allEndpoints.addAll(controllerEndpointsSupplier.getEndpoints());
+-		String basePath = webEndpointProperties.getBasePath();
+-		EndpointMapping endpointMapping = new EndpointMapping(basePath);
+-		boolean shouldRegisterLinksMapping = this.shouldRegisterLinksMapping(webEndpointProperties, environment, basePath);
+-		return new WebMvcEndpointHandlerMapping(endpointMapping, webEndpoints, endpointMediaTypes, corsProperties.toCorsConfiguration(), new EndpointLinksResolver(allEndpoints, basePath), shouldRegisterLinksMapping, null);
+-	}
+-
+-
+-	private boolean shouldRegisterLinksMapping(WebEndpointProperties webEndpointProperties, Environment environment, String basePath) {
+-		return webEndpointProperties.getDiscovery().isEnabled() && (StringUtils.hasText(basePath) || ManagementPortType.get(environment).equals(ManagementPortType.DIFFERENT));
+-	}
+-}
+diff --git a/src/main/java/ir/expense/tracker/makharej/WebConfig.java b/src/main/java/ir/expense/tracker/makharej/WebConfig.java
+new file mode 100644
+index 0000000..f9df993
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/WebConfig.java
+@@ -0,0 +1,38 @@
++package ir.expense.tracker.makharej;
++
++
++import org.springframework.context.annotation.Configuration;
++import org.springframework.http.converter.HttpMessageConverter;
++import org.springframework.http.converter.yaml.MappingJackson2YamlHttpMessageConverter;
++import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
++import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
++
++import java.util.List;
++
++
++/**
++ * Keeps the request handling behaviour of the Spring Boot 2.7 / Spring 5.3 version of the application.
++ */
++@Configuration
++public class WebConfig implements WebMvcConfigurer {
++
++	/**
++	 * Spring 6 no longer maps "/api/category/" to the handler of "/api/category". It used to.
++	 */
++	@Override
++	@SuppressWarnings("deprecation")
++	public void configurePathMatch(PathMatchConfigurer configurer) {
++
++		configurer.setUseTrailingSlashMatch(true);
++	}
++
++	/**
++	 * Spring 6.2 registers a YAML message converter as soon as jackson-dataformat-yaml is on the classpath
++	 * (springdoc brings it). The API only ever spoke JSON, so do not start accepting/producing application/yaml.
++	 */
++	@Override
++	public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
++
++		converters.removeIf(converter -> converter instanceof MappingJackson2YamlHttpMessageConverter);
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/aspect/AppendUserImplementation.java b/src/main/java/ir/expense/tracker/makharej/aspect/AppendUserImplementation.java
+index 1745c21..5957f3d 100644
+--- a/src/main/java/ir/expense/tracker/makharej/aspect/AppendUserImplementation.java
++++ b/src/main/java/ir/expense/tracker/makharej/aspect/AppendUserImplementation.java
+@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
+ import org.springframework.web.context.request.RequestContextHolder;
+ import org.springframework.web.context.request.ServletRequestAttributes;
+ 
+-import javax.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletRequest;
+ import java.lang.annotation.Annotation;
+ import java.lang.reflect.Method;
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/common/ExceptionHandler.java b/src/main/java/ir/expense/tracker/makharej/common/ExceptionHandler.java
+index a351c05..e7a286a 100644
+--- a/src/main/java/ir/expense/tracker/makharej/common/ExceptionHandler.java
++++ b/src/main/java/ir/expense/tracker/makharej/common/ExceptionHandler.java
+@@ -7,15 +7,20 @@ import ir.expense.tracker.makharej.common.messages.ErrorMessages;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.http.HttpHeaders;
+ import org.springframework.http.HttpStatus;
++import org.springframework.http.HttpStatusCode;
++import org.springframework.http.ProblemDetail;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.validation.FieldError;
+ import org.springframework.web.bind.MethodArgumentNotValidException;
+ import org.springframework.web.bind.annotation.ControllerAdvice;
+ import org.springframework.web.bind.annotation.ResponseBody;
+ import org.springframework.web.bind.annotation.ResponseStatus;
++import org.springframework.web.context.request.ServletWebRequest;
+ import org.springframework.web.context.request.WebRequest;
++import org.springframework.web.servlet.resource.NoResourceFoundException;
+ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+ 
++import java.io.IOException;
+ import java.util.HashMap;
+ import java.util.Map;
+ 
+@@ -24,7 +29,7 @@ import java.util.Map;
+ public class ExceptionHandler extends ResponseEntityExceptionHandler {
+ 
+ 	@Override
+-	protected ResponseEntity handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatus status, WebRequest request) {
++	protected ResponseEntity handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+ 
+ 		Map<String , String> errors = new HashMap<>();
+ 		ex.getBindingResult().getAllErrors().forEach((error) -> {
+@@ -36,6 +41,39 @@ public class ExceptionHandler extends ResponseEntityExceptionHandler {
+ 		return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+ 	}
+ 
++	/**
++	 * Since Spring 6 the framework exceptions handled by {@link ResponseEntityExceptionHandler} (malformed JSON,
++	 * missing parameter, wrong method/media type, ...) are rendered as an RFC 7807 {@link ProblemDetail} body.
++	 * This API has always answered those with the bare status code and no body, so keep doing that.
++	 */
++	@Override
++	protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
++
++		ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
++		if (response != null && response.getBody() instanceof ProblemDetail) {
++			return new ResponseEntity<>(null, response.getHeaders(), response.getStatusCode());
++		}
++		return response;
++	}
++
++	/**
++	 * Spring 6.1+ throws {@link NoResourceFoundException} for unmapped paths, where the resource handler used to
++	 * call {@code response.sendError(404)} (which Spring Boot renders through its /error page). Do the same.
++	 */
++	@Override
++	protected ResponseEntity<Object> handleNoResourceFoundException(NoResourceFoundException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
++
++		if (request instanceof ServletWebRequest servletWebRequest && servletWebRequest.getResponse() != null) {
++			try {
++				servletWebRequest.getResponse().sendError(HttpStatus.NOT_FOUND.value());
++			}
++			catch (IOException ioException) {
++				log.warn("could not send 404 for {}", request, ioException);
++			}
++		}
++		return null;
++	}
++
+ 	@org.springframework.web.bind.annotation.ExceptionHandler(value = InvalidToken.class)
+ 	@ResponseStatus(HttpStatus.BAD_REQUEST)
+ 	public ResponseEntity<?> handleException(InvalidToken ex) {
+diff --git a/src/main/java/ir/expense/tracker/makharej/common/exception/TriggerNotFoundException.java b/src/main/java/ir/expense/tracker/makharej/common/exception/TriggerNotFoundException.java
+new file mode 100644
+index 0000000..8dcabf8
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/common/exception/TriggerNotFoundException.java
+@@ -0,0 +1,13 @@
++package ir.expense.tracker.makharej.common.exception;
++
++
++import ir.expense.tracker.makharej.common.messages.ErrorMessages;
++
++
++public class TriggerNotFoundException extends DomainException {
++
++	public TriggerNotFoundException()
++	{
++		super(ErrorMessages.TRIGGER_NOT_FOUND_EXCEPTION);
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/common/messages/ErrorMessages.java b/src/main/java/ir/expense/tracker/makharej/common/messages/ErrorMessages.java
+index aef56a8..29fe264 100644
+--- a/src/main/java/ir/expense/tracker/makharej/common/messages/ErrorMessages.java
++++ b/src/main/java/ir/expense/tracker/makharej/common/messages/ErrorMessages.java
+@@ -17,4 +17,8 @@ public class ErrorMessages {
+ 	public static final String INTERNAL_ERROR = "internal error!";
+ 	public static final String USER_ID_CANNOT_BE_NULL = "user id cannot be null!";
+ 	public static final String INVALID_TOKEN = "invalid token!";
++	public static final String PERIOD_CANNOT_BE_NULL = "period cannot be null!";
++	public static final String TRIGGER_NOT_FOUND_EXCEPTION = "trigger not found!";
++	public static final String LIMIT_CANNOT_BE_NULL = "limit cannot be null!";
++	public static final String LIMIT_MUST_BE_POSITIVE = "limit must be greater than zero!";
+ }
+diff --git a/src/main/java/ir/expense/tracker/makharej/common/util/TehranDateTimeDeserializer.java b/src/main/java/ir/expense/tracker/makharej/common/util/TehranDateTimeDeserializer.java
+new file mode 100644
+index 0000000..ebddeca
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/common/util/TehranDateTimeDeserializer.java
+@@ -0,0 +1,46 @@
++package ir.expense.tracker.makharej.common.util;
++
++
++import com.fasterxml.jackson.core.JsonParser;
++import com.fasterxml.jackson.core.JsonToken;
++import com.fasterxml.jackson.databind.DeserializationContext;
++import com.fasterxml.jackson.databind.JsonDeserializer;
++
++import java.io.IOException;
++import java.time.LocalDateTime;
++import java.time.ZoneId;
++import java.time.format.DateTimeFormatter;
++import java.time.format.DateTimeFormatterBuilder;
++import java.time.format.DateTimeParseException;
++import java.time.format.ResolverStyle;
++import java.util.Date;
++
++
++/**
++ * Reads "yyyy-MM-dd HH:mm:ss" (seconds are optional) as Tehran time, the way the rest of the API reads dates.
++ * A number is still taken as epoch milliseconds.
++ */
++public class TehranDateTimeDeserializer extends JsonDeserializer<Date> {
++
++	private static final ZoneId TEHRAN = ZoneId.of("Asia/Tehran");
++	private static final DateTimeFormatter FORMAT = new DateTimeFormatterBuilder()
++			.appendPattern("uuuu-MM-dd HH:mm")
++			.optionalStart().appendPattern(":ss").optionalEnd()
++			.toFormatter()
++			.withResolverStyle(ResolverStyle.STRICT);
++
++	@Override
++	public Date deserialize(JsonParser parser, DeserializationContext context) throws IOException {
++
++		if (parser.currentToken() == JsonToken.VALUE_NUMBER_INT) {
++			return new Date(parser.getLongValue());
++		}
++		String text = parser.getValueAsString();
++		try {
++			return Date.from(LocalDateTime.parse(text.trim(), FORMAT).atZone(TEHRAN).toInstant());
++		}
++		catch (DateTimeParseException | NullPointerException e) {
++			return (Date) context.handleWeirdStringValue(Date.class, text, "expected a date like 2023-05-03 12:12:12");
++		}
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/controller/AuthenticationController.java b/src/main/java/ir/expense/tracker/makharej/controller/AuthenticationController.java
+index 68555d9..dc618bc 100644
+--- a/src/main/java/ir/expense/tracker/makharej/controller/AuthenticationController.java
++++ b/src/main/java/ir/expense/tracker/makharej/controller/AuthenticationController.java
+@@ -13,7 +13,7 @@ import org.springframework.http.HttpStatus;
+ import org.springframework.stereotype.Controller;
+ import org.springframework.web.bind.annotation.*;
+ 
+-import javax.validation.Valid;
++import jakarta.validation.Valid;
+ import java.util.List;
+ 
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/controller/CategoryController.java b/src/main/java/ir/expense/tracker/makharej/controller/CategoryController.java
+index 967885b..c46c9bd 100644
+--- a/src/main/java/ir/expense/tracker/makharej/controller/CategoryController.java
++++ b/src/main/java/ir/expense/tracker/makharej/controller/CategoryController.java
+@@ -13,10 +13,11 @@ import ir.expense.tracker.makharej.entity.Category;
+ import ir.expense.tracker.makharej.service.CategoryService;
+ import lombok.RequiredArgsConstructor;
+ import org.springframework.http.HttpStatus;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
+ import org.springframework.stereotype.Controller;
+ import org.springframework.web.bind.annotation.*;
+ 
+-import javax.validation.Valid;
++import jakarta.validation.Valid;
+ import java.util.List;
+ 
+ 
+@@ -39,16 +40,16 @@ public class CategoryController {
+ 	@PatchMapping
+ 	@ResponseStatus(HttpStatus.OK)
+ 	@ResponseBody
+-	public CategoryResponse updateCategory(@Valid @RequestBody CategoryUpdateRequest categoryUpdateRequest) throws CategoryNotFoundException {
+-		return categoryService.updateCategory(categoryUpdateRequest);
++	public CategoryResponse updateCategory(@Valid @RequestBody CategoryUpdateRequest categoryUpdateRequest, @AuthenticationPrincipal(expression = "id") Long userId) throws CategoryNotFoundException {
++		return categoryService.updateCategory(categoryUpdateRequest, userId);
+ 	}
+ 
+ 	@GetMapping
+ 	@ResponseStatus(HttpStatus.OK)
+ 	@ResponseBody
+-	public CategoryResponse findCategoryById(@Valid @RequestParam Long id) throws CategoryNotFoundException {
++	public CategoryResponse findCategoryById(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws CategoryNotFoundException {
+ 
+-		return categoryService.findById(id);
++		return categoryService.findById(id, userId);
+ 	}
+ 
+ 	@PostMapping(path = "/find")
+@@ -63,8 +64,8 @@ public class CategoryController {
+ 	@DeleteMapping
+ 	@ResponseStatus(HttpStatus.OK)
+ 	@ResponseBody
+-	public CategoryResponse delete(@Valid @RequestParam Long id) throws CategoryNotFoundException {
++	public CategoryResponse delete(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws CategoryNotFoundException {
+ 
+-		return categoryService.deleteCategory(id);
++		return categoryService.deleteCategory(id, userId);
+ 	}
+ }
+diff --git a/src/main/java/ir/expense/tracker/makharej/controller/ExpenseController.java b/src/main/java/ir/expense/tracker/makharej/controller/ExpenseController.java
+index 05ef761..4005a9b 100644
+--- a/src/main/java/ir/expense/tracker/makharej/controller/ExpenseController.java
++++ b/src/main/java/ir/expense/tracker/makharej/controller/ExpenseController.java
+@@ -19,10 +19,11 @@ import ir.expense.tracker.makharej.service.CategoryService;
+ import ir.expense.tracker.makharej.service.ExpenseService;
+ import lombok.RequiredArgsConstructor;
+ import org.springframework.http.HttpStatus;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
+ import org.springframework.stereotype.Controller;
+ import org.springframework.web.bind.annotation.*;
+ 
+-import javax.validation.Valid;
++import jakarta.validation.Valid;
+ import java.util.List;
+ 
+ 
+@@ -45,25 +46,25 @@ public class ExpenseController {
+ 	@PatchMapping
+ 	@ResponseStatus(HttpStatus.OK)
+ 	@ResponseBody
+-	public ExpenseResponse updateExpense(@Valid @RequestBody ExpenseUpdateRequest request) throws ExpenseNotFoundException, CategoryNotFoundException {
++	public ExpenseResponse updateExpense(@Valid @RequestBody ExpenseUpdateRequest request, @AuthenticationPrincipal(expression = "id") Long userId) throws ExpenseNotFoundException, CategoryNotFoundException {
+ 
+-		return expenseService.updateExpense(request);
++		return expenseService.updateExpense(request, userId);
+ 	}
+ 
+ 	@GetMapping
+ 	@ResponseStatus(HttpStatus.OK)
+ 	@ResponseBody
+-	public ExpenseResponse findExpenseById(@Valid @RequestParam Long id) throws ExpenseNotFoundException {
++	public ExpenseResponse findExpenseById(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws ExpenseNotFoundException {
+ 
+-		return expenseService.findById(id);
++		return expenseService.findById(id, userId);
+ 	}
+ 
+ 	@DeleteMapping
+ 	@ResponseStatus(HttpStatus.OK)
+ 	@ResponseBody
+-	public ExpenseResponse delete(@Valid @RequestParam Long id) throws ExpenseNotFoundException {
++	public ExpenseResponse delete(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws ExpenseNotFoundException {
+ 
+-		return expenseService.deleteExpense(id);
++		return expenseService.deleteExpense(id, userId);
+ 	}
+ 
+ 	@PostMapping("/find")
+diff --git a/src/main/java/ir/expense/tracker/makharej/controller/ReportController.java b/src/main/java/ir/expense/tracker/makharej/controller/ReportController.java
+new file mode 100644
+index 0000000..7d06b72
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/controller/ReportController.java
+@@ -0,0 +1,29 @@
++package ir.expense.tracker.makharej.controller;
++
++
++import ir.expense.tracker.makharej.dto.report.ReportRequest;
++import ir.expense.tracker.makharej.dto.report.ReportResponse;
++import ir.expense.tracker.makharej.service.ReportService;
++import jakarta.validation.Valid;
++import lombok.RequiredArgsConstructor;
++import org.springframework.http.HttpStatus;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
++import org.springframework.stereotype.Controller;
++import org.springframework.web.bind.annotation.*;
++
++
++@Controller
++@RequestMapping(path = "/api/report")
++@RequiredArgsConstructor
++public class ReportController {
++
++	private final ReportService reportService;
++
++	@PostMapping
++	@ResponseStatus(HttpStatus.OK)
++	@ResponseBody
++	public ReportResponse report(@Valid @RequestBody ReportRequest request, @AuthenticationPrincipal(expression = "id") Long userId) {
++
++		return reportService.report(request, userId);
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/controller/TriggerController.java b/src/main/java/ir/expense/tracker/makharej/controller/TriggerController.java
+new file mode 100644
+index 0000000..1bb85c4
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/controller/TriggerController.java
+@@ -0,0 +1,68 @@
++package ir.expense.tracker.makharej.controller;
++
++
++import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
++import ir.expense.tracker.makharej.common.exception.TriggerNotFoundException;
++import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
++import ir.expense.tracker.makharej.dto.trigger.TriggerListRequest;
++import ir.expense.tracker.makharej.dto.trigger.TriggerRequest;
++import ir.expense.tracker.makharej.dto.trigger.TriggerResponse;
++import ir.expense.tracker.makharej.dto.trigger.TriggerUpdateRequest;
++import ir.expense.tracker.makharej.service.TriggerService;
++import jakarta.validation.Valid;
++import lombok.RequiredArgsConstructor;
++import org.springframework.http.HttpStatus;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
++import org.springframework.stereotype.Controller;
++import org.springframework.web.bind.annotation.*;
++
++import java.util.List;
++
++
++@Controller
++@RequestMapping(path = "/api/trigger")
++@RequiredArgsConstructor
++public class TriggerController {
++
++	private final TriggerService triggerService;
++
++	@PostMapping
++	@ResponseStatus(HttpStatus.CREATED)
++	@ResponseBody
++	public TriggerResponse createTrigger(@Valid @RequestBody TriggerRequest request, @AuthenticationPrincipal(expression = "id") Long userId) throws CategoryNotFoundException, UserNotFoundException {
++
++		return triggerService.createTrigger(request, userId);
++	}
++
++	@PatchMapping
++	@ResponseStatus(HttpStatus.OK)
++	@ResponseBody
++	public TriggerResponse updateTrigger(@Valid @RequestBody TriggerUpdateRequest request, @AuthenticationPrincipal(expression = "id") Long userId) throws TriggerNotFoundException, CategoryNotFoundException {
++
++		return triggerService.updateTrigger(request, userId);
++	}
++
++	@GetMapping
++	@ResponseStatus(HttpStatus.OK)
++	@ResponseBody
++	public TriggerResponse findTriggerById(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws TriggerNotFoundException {
++
++		return triggerService.findById(id, userId);
++	}
++
++	@PostMapping(path = "/find")
++	@ResponseStatus(HttpStatus.OK)
++	@ResponseBody
++	public List<TriggerResponse> findTriggers(@Valid @RequestBody TriggerListRequest request, @AuthenticationPrincipal(expression = "id") Long userId) {
++
++		return triggerService.find(request, userId);
++	}
++
++	@DeleteMapping
++	@ResponseStatus(HttpStatus.OK)
++	@ResponseBody
++	public TriggerResponse delete(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws TriggerNotFoundException {
++
++		return triggerService.deleteTrigger(id, userId);
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/controller/UserController.java b/src/main/java/ir/expense/tracker/makharej/controller/UserController.java
+index eb0f50d..759de17 100644
+--- a/src/main/java/ir/expense/tracker/makharej/controller/UserController.java
++++ b/src/main/java/ir/expense/tracker/makharej/controller/UserController.java
+@@ -15,11 +15,11 @@ import ir.expense.tracker.makharej.service.CategoryService;
+ import ir.expense.tracker.makharej.service.UserService;
+ import lombok.RequiredArgsConstructor;
+ import org.springframework.http.HttpStatus;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
+ import org.springframework.stereotype.Controller;
+ import org.springframework.web.bind.annotation.*;
+ 
+-import javax.validation.Valid;
+-import java.util.List;
++import jakarta.validation.Valid;
+ 
+ 
+ @Controller
+@@ -31,22 +31,17 @@ public class UserController {
+ 
+ 	@GetMapping
+ 	@ResponseStatus(HttpStatus.OK)
+-	public UserResponse findUserById(@Valid @RequestParam Long id) throws UserNotFoundException {
++	@ResponseBody
++	public UserResponse findUserById(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws UserNotFoundException {
+ 
+-		return userService.findById(id);
+-	}
+-
+-	@GetMapping(path = "/find/all")
+-	@ResponseStatus(HttpStatus.OK)
+-	public List<UserResponse> findAllUsers() {
+-
+-		return userService.findAllUsers();
++		return userService.findById(id, userId);
+ 	}
+ 
+ 	@DeleteMapping
+ 	@ResponseStatus(HttpStatus.OK)
+-	public UserResponse delete(@Valid @RequestParam Long id) throws UserNotFoundException {
++	@ResponseBody
++	public UserResponse delete(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws UserNotFoundException {
+ 
+-		return userService.deleteUser(id);
++		return userService.deleteUser(id, userId);
+ 	}
+ }
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryListRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryListRequest.java
+index a5018a1..bf6060e 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryListRequest.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryListRequest.java
+@@ -8,8 +8,8 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotEmpty;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
+ 
+ 
+ @Builder
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryRequest.java
+index 89404ca..59c5e65 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryRequest.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryRequest.java
+@@ -8,9 +8,9 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotBlank;
+-import javax.validation.constraints.NotEmpty;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
+ 
+ 
+ @Builder
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryUpdateRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryUpdateRequest.java
+index 19110bb..2a9b924 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryUpdateRequest.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/category/CategoryUpdateRequest.java
+@@ -8,8 +8,8 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotEmpty;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
+ 
+ 
+ @Builder
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseListRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseListRequest.java
+index 6f7b293..6cc63b8 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseListRequest.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseListRequest.java
+@@ -9,8 +9,8 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotBlank;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.NotNull;
+ import java.util.Date;
+ 
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseRequest.java
+index fd51146..b7964d2 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseRequest.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseRequest.java
+@@ -6,8 +6,8 @@ import ir.expense.tracker.makharej.common.messages.ErrorMessages;
+ import ir.expense.tracker.makharej.dto.user.Userable;
+ import lombok.*;
+ 
+-import javax.validation.constraints.NotBlank;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.NotNull;
+ import java.util.Date;
+ import java.util.Locale;
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseResponse.java b/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseResponse.java
+index a3cd1a3..0ecd87f 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseResponse.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseResponse.java
+@@ -7,8 +7,8 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotBlank;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.NotNull;
+ import java.util.Date;
+ 
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseUpdateRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseUpdateRequest.java
+index 4685d22..24de235 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseUpdateRequest.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/expense/ExpenseUpdateRequest.java
+@@ -1,14 +1,15 @@
+ package ir.expense.tracker.makharej.dto.expense;
+ 
+ 
+-import com.fasterxml.jackson.annotation.JsonFormat;
++import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
++import ir.expense.tracker.makharej.common.util.TehranDateTimeDeserializer;
+ import lombok.AllArgsConstructor;
+ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotBlank;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.NotNull;
+ import java.util.Date;
+ 
+ 
+@@ -23,7 +24,7 @@ public class ExpenseUpdateRequest {
+ 	private Double amount;
+ 	private String tag;
+ 	private String note;
+-	@JsonFormat(pattern = "yyyy-mm-dd HH:mm")
++	@JsonDeserialize(using = TehranDateTimeDeserializer.class)
+ 	private Date expenseDate;
+ 	private Long categoryId;
+ }
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/filter/AuthenticationTokenFilter.java b/src/main/java/ir/expense/tracker/makharej/dto/filter/AuthenticationTokenFilter.java
+index 2c75edc..8e156ee 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/filter/AuthenticationTokenFilter.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/filter/AuthenticationTokenFilter.java
+@@ -14,10 +14,10 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
+ import org.springframework.util.StringUtils;
+ import org.springframework.web.filter.OncePerRequestFilter;
+ 
+-import javax.servlet.FilterChain;
+-import javax.servlet.ServletException;
+-import javax.servlet.http.HttpServletRequest;
+-import javax.servlet.http.HttpServletResponse;
++import jakarta.servlet.FilterChain;
++import jakarta.servlet.ServletException;
++import jakarta.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletResponse;
+ import java.io.IOException;
+ 
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/report/ReportPeriod.java b/src/main/java/ir/expense/tracker/makharej/dto/report/ReportPeriod.java
+new file mode 100644
+index 0000000..3afcf5e
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/dto/report/ReportPeriod.java
+@@ -0,0 +1,8 @@
++package ir.expense.tracker.makharej.dto.report;
++
++
++public enum ReportPeriod {
++
++	MONTH,
++	YEAR
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/report/ReportPeriodResponse.java b/src/main/java/ir/expense/tracker/makharej/dto/report/ReportPeriodResponse.java
+new file mode 100644
+index 0000000..62feee1
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/dto/report/ReportPeriodResponse.java
+@@ -0,0 +1,20 @@
++package ir.expense.tracker.makharej.dto.report;
++
++
++import lombok.AllArgsConstructor;
++import lombok.Builder;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++
++@Builder
++@Data
++@AllArgsConstructor
++@NoArgsConstructor
++public class ReportPeriodResponse {
++
++	/** "2023-05" for a month, "2023" for a year. */
++	private String period;
++	private Double totalAmount;
++	private Long count;
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/report/ReportRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/report/ReportRequest.java
+new file mode 100644
+index 0000000..f2a77e1
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/dto/report/ReportRequest.java
+@@ -0,0 +1,35 @@
++package ir.expense.tracker.makharej.dto.report;
++
++
++import com.fasterxml.jackson.annotation.JsonFormat;
++import ir.expense.tracker.makharej.common.messages.ErrorMessages;
++import jakarta.validation.constraints.NotNull;
++import lombok.AllArgsConstructor;
++import lombok.Builder;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++import java.util.Date;
++
++
++/**
++ * Which expenses go into the report: the same filters as the expense search.
++ */
++@Builder
++@Data
++@AllArgsConstructor
++@NoArgsConstructor
++public class ReportRequest {
++
++	@NotNull(message = ErrorMessages.PERIOD_CANNOT_BE_NULL)
++	private ReportPeriod period;
++
++	private String name;
++	private String tag;
++	@JsonFormat(pattern= "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Tehran")
++	private Date fromDate;
++	@JsonFormat(pattern= "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Tehran")
++	private Date toDate;
++
++	private Long categoryId;
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/report/ReportResponse.java b/src/main/java/ir/expense/tracker/makharej/dto/report/ReportResponse.java
+new file mode 100644
+index 0000000..ed3604a
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/dto/report/ReportResponse.java
+@@ -0,0 +1,22 @@
++package ir.expense.tracker.makharej.dto.report;
++
++
++import lombok.AllArgsConstructor;
++import lombok.Builder;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++import java.util.List;
++
++
++@Builder
++@Data
++@AllArgsConstructor
++@NoArgsConstructor
++public class ReportResponse {
++
++	private ReportPeriod period;
++	private Double totalAmount;
++	private Long count;
++	private List<ReportPeriodResponse> periods;
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerListRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerListRequest.java
+new file mode 100644
+index 0000000..5570266
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerListRequest.java
+@@ -0,0 +1,21 @@
++package ir.expense.tracker.makharej.dto.trigger;
++
++
++import lombok.AllArgsConstructor;
++import lombok.Builder;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++
++@Builder
++@Data
++@NoArgsConstructor
++@AllArgsConstructor
++public class TriggerListRequest {
++
++	/** Part of the name of the trigger. */
++	private String name;
++
++	/** true: only the alarms that are going off now, false: only the quiet ones. */
++	private Boolean triggered;
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerRequest.java
+new file mode 100644
+index 0000000..9d8fab2
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerRequest.java
+@@ -0,0 +1,35 @@
++package ir.expense.tracker.makharej.dto.trigger;
++
++
++import ir.expense.tracker.makharej.common.messages.ErrorMessages;
++import ir.expense.tracker.makharej.dto.report.ReportPeriod;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
++import jakarta.validation.constraints.Positive;
++import lombok.AllArgsConstructor;
++import lombok.Builder;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++
++@Builder
++@Data
++@NoArgsConstructor
++@AllArgsConstructor
++public class TriggerRequest {
++
++	@NotNull(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
++	@NotEmpty(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
++	private String name;
++
++	@NotNull(message = ErrorMessages.PERIOD_CANNOT_BE_NULL)
++	private ReportPeriod period;
++
++	@NotNull(message = ErrorMessages.LIMIT_CANNOT_BE_NULL)
++	@Positive(message = ErrorMessages.LIMIT_MUST_BE_POSITIVE)
++	private Double limit;
++
++	private String expenseName;
++	private String tag;
++	private Long categoryId;
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerResponse.java b/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerResponse.java
+new file mode 100644
+index 0000000..40d6cef
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerResponse.java
+@@ -0,0 +1,31 @@
++package ir.expense.tracker.makharej.dto.trigger;
++
++
++import ir.expense.tracker.makharej.dto.report.ReportPeriod;
++import lombok.AllArgsConstructor;
++import lombok.Builder;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++
++@Builder
++@Data
++@NoArgsConstructor
++@AllArgsConstructor
++public class TriggerResponse {
++
++	private Long id;
++	private String name;
++	private ReportPeriod period;
++	private Double limit;
++	private String expenseName;
++	private String tag;
++	private Long categoryId;
++
++	/** The month ("2023-05") or year ("2023") that the amount below is about: the current one. */
++	private String currentPeriod;
++	/** What the matching expenses add up to in the current period. */
++	private Double currentAmount;
++	/** true when currentAmount is more than the limit. */
++	private Boolean triggered;
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerUpdateRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerUpdateRequest.java
+new file mode 100644
+index 0000000..3ae8948
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/dto/trigger/TriggerUpdateRequest.java
+@@ -0,0 +1,41 @@
++package ir.expense.tracker.makharej.dto.trigger;
++
++
++import ir.expense.tracker.makharej.common.messages.ErrorMessages;
++import ir.expense.tracker.makharej.dto.report.ReportPeriod;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
++import jakarta.validation.constraints.Positive;
++import lombok.AllArgsConstructor;
++import lombok.Builder;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++
++/**
++ * Replaces everything but the id, so it has to be complete.
++ */
++@Builder
++@Data
++@NoArgsConstructor
++@AllArgsConstructor
++public class TriggerUpdateRequest {
++
++	@NotNull(message = ErrorMessages.ID_CANNOT_BE_NULL)
++	private Long id;
++
++	@NotNull(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
++	@NotEmpty(message = ErrorMessages.NAME_CANNOT_BE_NULL_OR_EMPTY)
++	private String name;
++
++	@NotNull(message = ErrorMessages.PERIOD_CANNOT_BE_NULL)
++	private ReportPeriod period;
++
++	@NotNull(message = ErrorMessages.LIMIT_CANNOT_BE_NULL)
++	@Positive(message = ErrorMessages.LIMIT_MUST_BE_POSITIVE)
++	private Double limit;
++
++	private String expenseName;
++	private String tag;
++	private Long categoryId;
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/user/LoginRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/user/LoginRequest.java
+index 15e0505..008d343 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/user/LoginRequest.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/user/LoginRequest.java
+@@ -7,8 +7,8 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotEmpty;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
+ 
+ 
+ @Builder
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/user/LoginResponse.java b/src/main/java/ir/expense/tracker/makharej/dto/user/LoginResponse.java
+index 41b6fe1..a77fbdc 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/user/LoginResponse.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/user/LoginResponse.java
+@@ -7,8 +7,8 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotEmpty;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
+ 
+ 
+ @Builder
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/user/UserRequest.java b/src/main/java/ir/expense/tracker/makharej/dto/user/UserRequest.java
+index d62c55b..055dd91 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/user/UserRequest.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/user/UserRequest.java
+@@ -7,8 +7,8 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotEmpty;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
+ 
+ 
+ @Builder
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/user/UserResponse.java b/src/main/java/ir/expense/tracker/makharej/dto/user/UserResponse.java
+index d18458e..5e9d134 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/user/UserResponse.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/user/UserResponse.java
+@@ -7,8 +7,8 @@ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+ 
+-import javax.validation.constraints.NotEmpty;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.NotNull;
+ 
+ 
+ @Builder
+diff --git a/src/main/java/ir/expense/tracker/makharej/dto/user/Userable.java b/src/main/java/ir/expense/tracker/makharej/dto/user/Userable.java
+index 5400244..976a2fc 100644
+--- a/src/main/java/ir/expense/tracker/makharej/dto/user/Userable.java
++++ b/src/main/java/ir/expense/tracker/makharej/dto/user/Userable.java
+@@ -1,7 +1,7 @@
+ package ir.expense.tracker.makharej.dto.user;
+ 
+ 
+-import io.swagger.annotations.ApiModelProperty;
++import io.swagger.v3.oas.annotations.media.Schema;
+ import lombok.*;
+ 
+ 
+@@ -9,6 +9,6 @@ import lombok.*;
+ @Setter
+ public class Userable {
+ 
+-	@ApiModelProperty(required = false, hidden = true)
++	@Schema(hidden = true)
+ 	private Long userId;
+ }
+diff --git a/src/main/java/ir/expense/tracker/makharej/entity/AbstractEntity.java b/src/main/java/ir/expense/tracker/makharej/entity/AbstractEntity.java
+index 628c9e3..149488f 100644
+--- a/src/main/java/ir/expense/tracker/makharej/entity/AbstractEntity.java
++++ b/src/main/java/ir/expense/tracker/makharej/entity/AbstractEntity.java
+@@ -3,7 +3,7 @@ package ir.expense.tracker.makharej.entity;
+ 
+ import lombok.*;
+ 
+-import javax.persistence.*;
++import jakarta.persistence.*;
+ import java.util.Date;
+ 
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/entity/Category.java b/src/main/java/ir/expense/tracker/makharej/entity/Category.java
+index 4555234..2fc692f 100644
+--- a/src/main/java/ir/expense/tracker/makharej/entity/Category.java
++++ b/src/main/java/ir/expense/tracker/makharej/entity/Category.java
+@@ -3,7 +3,7 @@ package ir.expense.tracker.makharej.entity;
+ 
+ import lombok.*;
+ 
+-import javax.persistence.*;
++import jakarta.persistence.*;
+ 
+ 
+ @Entity
+diff --git a/src/main/java/ir/expense/tracker/makharej/entity/Expense.java b/src/main/java/ir/expense/tracker/makharej/entity/Expense.java
+index 3daf85d..63c401c 100644
+--- a/src/main/java/ir/expense/tracker/makharej/entity/Expense.java
++++ b/src/main/java/ir/expense/tracker/makharej/entity/Expense.java
+@@ -3,7 +3,7 @@ package ir.expense.tracker.makharej.entity;
+ 
+ import lombok.*;
+ 
+-import javax.persistence.*;
++import jakarta.persistence.*;
+ import java.util.Date;
+ 
+ 
+diff --git a/src/main/java/ir/expense/tracker/makharej/entity/ExpenseTrigger.java b/src/main/java/ir/expense/tracker/makharej/entity/ExpenseTrigger.java
+new file mode 100644
+index 0000000..56f46ee
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/entity/ExpenseTrigger.java
+@@ -0,0 +1,44 @@
++package ir.expense.tracker.makharej.entity;
++
++
++import ir.expense.tracker.makharej.dto.report.ReportPeriod;
++import jakarta.persistence.*;
++import lombok.*;
++
++
++/**
++ * A budget rule of a user: the alarm goes off when the matching expenses of the current month (or year) add up to
++ * more than the limit. The table is not called "trigger" because that is a reserved word.
++ */
++@Entity
++@Table(name = "expense_trigger")
++@Builder
++@Getter
++@Setter
++@NoArgsConstructor
++@AllArgsConstructor
++public class ExpenseTrigger extends AbstractEntity {
++
++	@Column(nullable = false)
++	private String name;
++
++	@Enumerated(EnumType.STRING)
++	@Column(name = "report_period", nullable = false)
++	private ReportPeriod period;
++
++	@Column(name = "limit_amount", nullable = false)
++	private Double limit;
++
++	@Column(name = "expense_name")
++	private String expenseName;
++	private String tag;
++
++	@ManyToOne(fetch = FetchType.LAZY)
++	@JoinColumn(name = "category_fk")
++	private Category category;
++
++	@ManyToOne(fetch = FetchType.LAZY)
++	@JoinColumn(name = "user_fk", nullable = false)
++	private User user;
++
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/entity/User.java b/src/main/java/ir/expense/tracker/makharej/entity/User.java
+index e773650..e4acbf4 100644
+--- a/src/main/java/ir/expense/tracker/makharej/entity/User.java
++++ b/src/main/java/ir/expense/tracker/makharej/entity/User.java
+@@ -3,10 +3,10 @@ package ir.expense.tracker.makharej.entity;
+ 
+ import lombok.*;
+ 
+-import javax.persistence.Column;
+-import javax.persistence.Entity;
+-import javax.persistence.Table;
+-import javax.persistence.UniqueConstraint;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.Table;
++import jakarta.persistence.UniqueConstraint;
+ 
+ 
+ @Entity
+diff --git a/src/main/java/ir/expense/tracker/makharej/repository/ExpenseRepository.java b/src/main/java/ir/expense/tracker/makharej/repository/ExpenseRepository.java
+index 451b62c..af246d8 100644
+--- a/src/main/java/ir/expense/tracker/makharej/repository/ExpenseRepository.java
++++ b/src/main/java/ir/expense/tracker/makharej/repository/ExpenseRepository.java
+@@ -17,4 +17,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, Expense
+ 	@Query("Select e from Expense e where e.name like :name")
+ 	public List<Expense> findByNameContaining(@Param("name") String name);
+ 
++	@Query("Select e from Expense e where e.id=:id and e.user.id=:userId")
++	public Expense findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
++
+ }
+diff --git a/src/main/java/ir/expense/tracker/makharej/repository/ExpenseRepositoryImpl.java b/src/main/java/ir/expense/tracker/makharej/repository/ExpenseRepositoryImpl.java
+index 2a42a2c..16f309f 100644
+--- a/src/main/java/ir/expense/tracker/makharej/repository/ExpenseRepositoryImpl.java
++++ b/src/main/java/ir/expense/tracker/makharej/repository/ExpenseRepositoryImpl.java
+@@ -11,13 +11,13 @@ import org.springframework.data.repository.query.Param;
+ import org.springframework.stereotype.Repository;
+ import org.springframework.util.StringUtils;
+ 
+-import javax.persistence.EntityManager;
+-import javax.persistence.PersistenceContext;
+-import javax.persistence.PersistenceContextType;
+-import javax.persistence.criteria.CriteriaBuilder;
+-import javax.persistence.criteria.CriteriaQuery;
+-import javax.persistence.criteria.Predicate;
+-import javax.persistence.criteria.Root;
++import jakarta.persistence.EntityManager;
++import jakarta.persistence.PersistenceContext;
++import jakarta.persistence.PersistenceContextType;
++import jakarta.persistence.criteria.CriteriaBuilder;
++import jakarta.persistence.criteria.CriteriaQuery;
++import jakarta.persistence.criteria.Predicate;
++import jakarta.persistence.criteria.Root;
+ import java.util.ArrayList;
+ import java.util.Date;
+ import java.util.List;
+diff --git a/src/main/java/ir/expense/tracker/makharej/repository/ExpenseTriggerRepository.java b/src/main/java/ir/expense/tracker/makharej/repository/ExpenseTriggerRepository.java
+new file mode 100644
+index 0000000..eeacb50
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/repository/ExpenseTriggerRepository.java
+@@ -0,0 +1,21 @@
++package ir.expense.tracker.makharej.repository;
++
++
++import ir.expense.tracker.makharej.entity.ExpenseTrigger;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.query.Param;
++import org.springframework.stereotype.Repository;
++
++import java.util.List;
++
++
++@Repository
++public interface ExpenseTriggerRepository extends JpaRepository<ExpenseTrigger, Long> {
++
++	@Query("Select t from ExpenseTrigger t where t.id=:id and t.user.id=:userId and t.enable=true")
++	public ExpenseTrigger findActiveByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
++
++	@Query("Select t from ExpenseTrigger t where t.user.id=:userId and t.enable=true order by t.id")
++	public List<ExpenseTrigger> findActiveByUserId(@Param("userId") Long userId);
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/repository/UserRepository.java b/src/main/java/ir/expense/tracker/makharej/repository/UserRepository.java
+index f814b99..25cd169 100644
+--- a/src/main/java/ir/expense/tracker/makharej/repository/UserRepository.java
++++ b/src/main/java/ir/expense/tracker/makharej/repository/UserRepository.java
+@@ -15,4 +15,6 @@ import java.util.List;
+ public interface UserRepository extends JpaRepository<User, Long> {
+ 
+ 	public User findByUsername(String username);
++
++	public boolean existsByUsername(String username);
+ }
+diff --git a/src/main/java/ir/expense/tracker/makharej/security/AppUserDetails.java b/src/main/java/ir/expense/tracker/makharej/security/AppUserDetails.java
+new file mode 100644
+index 0000000..39ae7e1
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/security/AppUserDetails.java
+@@ -0,0 +1,28 @@
++package ir.expense.tracker.makharej.security;
++
++
++import org.springframework.security.core.GrantedAuthority;
++import org.springframework.security.core.userdetails.User;
++
++import java.util.Collection;
++
++
++/**
++ * The authenticated principal: a Spring Security user that also knows its database id, so controllers can tell
++ * who is calling without another lookup.
++ */
++public class AppUserDetails extends User {
++
++	private final Long id;
++
++	public AppUserDetails(Long id, String username, String password, Collection<? extends GrantedAuthority> authorities) {
++
++		super(username, password, authorities);
++		this.id = id;
++	}
++
++	public Long getId() {
++
++		return id;
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/security/CustomeAuthPoint.java b/src/main/java/ir/expense/tracker/makharej/security/CustomeAuthPoint.java
+index 1dc1d64..1704131 100644
+--- a/src/main/java/ir/expense/tracker/makharej/security/CustomeAuthPoint.java
++++ b/src/main/java/ir/expense/tracker/makharej/security/CustomeAuthPoint.java
+@@ -7,9 +7,9 @@ import org.springframework.security.core.AuthenticationException;
+ import org.springframework.security.web.AuthenticationEntryPoint;
+ import org.springframework.stereotype.Component;
+ 
+-import javax.servlet.ServletException;
+-import javax.servlet.http.HttpServletRequest;
+-import javax.servlet.http.HttpServletResponse;
++import jakarta.servlet.ServletException;
++import jakarta.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletResponse;
+ import java.io.IOException;
+ 
+ @Component
+diff --git a/src/main/java/ir/expense/tracker/makharej/security/SecurityConfig.java b/src/main/java/ir/expense/tracker/makharej/security/SecurityConfig.java
+index 682ce40..d820341 100644
+--- a/src/main/java/ir/expense/tracker/makharej/security/SecurityConfig.java
++++ b/src/main/java/ir/expense/tracker/makharej/security/SecurityConfig.java
+@@ -3,13 +3,19 @@ package ir.expense.tracker.makharej.security;
+ 
+ import ir.expense.tracker.makharej.dto.filter.AuthenticationTokenFilter;
+ import ir.expense.tracker.makharej.service.UserDetailServiceImpl;
++import jakarta.servlet.DispatcherType;
++import jakarta.servlet.RequestDispatcher;
++import jakarta.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletResponse;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.context.annotation.Bean;
+ import org.springframework.context.annotation.Configuration;
+ import org.springframework.security.authentication.AuthenticationManager;
+ import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
++import org.springframework.security.config.Customizer;
+ import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
++import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+ import org.springframework.security.config.http.SessionCreationPolicy;
+ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+ import org.springframework.security.crypto.password.PasswordEncoder;
+@@ -32,18 +38,24 @@ public class SecurityConfig {
+ 
+ 	@Bean
+ 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+-		http.cors().and().csrf().disable()
+-			.exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
+-			.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
+-				.authorizeRequests().antMatchers("/api/auth/**").permitAll()
+-				.antMatchers("/actuator/**").permitAll()
+-				.antMatchers("/v2/api-docs",
+-						 "/configuration/ui",
+-						 "/swagger-resources/**",
+-						 "/configuration/security",
++		http.cors(Customizer.withDefaults())
++			.csrf(AbstractHttpConfigurer::disable)
++			.exceptionHandling(exceptionHandling -> exceptionHandling.authenticationEntryPoint(unauthorizedHandler))
++			.sessionManagement(sessionManagement -> sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
++			.authorizeHttpRequests(authorize -> authorize
++				// Spring Security 6 authorizes the container's ERROR dispatch too, which would turn every error page
++				// (404, ...) into a 401. Spring Boot 2.7 let them through, except for 401s, which stay an empty body.
++				// Direct calls to /error are still protected.
++				.requestMatchers(SecurityConfig::isErrorDispatchOtherThanUnauthorized).permitAll()
++				.requestMatchers("/api/auth/**").permitAll()
++				.requestMatchers("/actuator/**").permitAll()
++				.requestMatchers("/v3/api-docs",
++						 "/v3/api-docs/**",
+ 						 "/swagger-ui.html",
++						 "/swagger-ui/**",
+ 						 "/webjars/**").permitAll()
+ 				.anyRequest().authenticated()
++			)
+ 		;
+ 
+ 		http.authenticationProvider(authenticationProvider());
+@@ -52,11 +64,15 @@ public class SecurityConfig {
+ 		return http.build();
+ 	}
+ 
++	private static boolean isErrorDispatchOtherThanUnauthorized(HttpServletRequest request) {
++		return request.getDispatcherType() == DispatcherType.ERROR
++				&& !Integer.valueOf(HttpServletResponse.SC_UNAUTHORIZED).equals(request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE));
++	}
++
+ 	@Bean
+ 	public DaoAuthenticationProvider authenticationProvider() {
+-		DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
++		DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
+ 
+-		authProvider.setUserDetailsService(userDetailsService);
+ 		authProvider.setPasswordEncoder(passwordEncoder());
+ 
+ 		return authProvider;
+diff --git a/src/main/java/ir/expense/tracker/makharej/service/CategoryService.java b/src/main/java/ir/expense/tracker/makharej/service/CategoryService.java
+index daa0a47..0d9b6c1 100644
+--- a/src/main/java/ir/expense/tracker/makharej/service/CategoryService.java
++++ b/src/main/java/ir/expense/tracker/makharej/service/CategoryService.java
+@@ -15,9 +15,9 @@ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.stereotype.Service;
+ 
+-import javax.transaction.Transactional;
+-import javax.validation.Valid;
+-import javax.validation.constraints.NotNull;
++import jakarta.transaction.Transactional;
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.NotNull;
+ import java.util.List;
+ import java.util.stream.Collectors;
+ 
+@@ -45,9 +45,9 @@ public class CategoryService {
+ 		return toCategoryResponse(category);
+ 	}
+ 
+-	public CategoryResponse updateCategory(@Valid @NotNull CategoryUpdateRequest categoryUpdateRequest) throws CategoryNotFoundException {
++	public CategoryResponse updateCategory(@Valid @NotNull CategoryUpdateRequest categoryUpdateRequest, Long userId) throws CategoryNotFoundException {
+ 
+-		Category category = findCategoryById(categoryUpdateRequest.getId());
++		Category category = findCategoryById(categoryUpdateRequest.getId(), userId);
+ 		category.setName(categoryUpdateRequest.getName());
+ 		categoryRepository.save(category);
+ 		log.info("category {} is updated.", category.getId());
+@@ -60,22 +60,31 @@ public class CategoryService {
+ 		return categories.stream().map(this	::toCategoryResponse).collect(Collectors.toList());
+ 	}
+ 
+-	public CategoryResponse deleteCategory(Long id) throws CategoryNotFoundException {
++	public CategoryResponse deleteCategory(Long id, Long userId) throws CategoryNotFoundException {
+ 
+-		Category category = findCategoryById(id);
++		Category category = findCategoryById(id, userId);
+ 		category.setEnable(null);
+ 		categoryRepository.save(category);
+ 		log.info("category {} is deleted.", category.getId());
+ 		return toCategoryResponse(category);
+ 	}
+ 
+-	public CategoryResponse findById(Long id) throws CategoryNotFoundException
++	public CategoryResponse findById(Long id, Long userId) throws CategoryNotFoundException
+ 	{
+-		return toCategoryResponse(categoryRepository.findById(id).orElseThrow(CategoryNotFoundException::new));
++		return toCategoryResponse(findCategoryById(id, userId));
+ 	}
+-	public Category findCategoryById(Long id) throws CategoryNotFoundException
++
++	/**
++	 * Finds a category of the given user. A category that belongs to somebody else is reported as not found.
++	 */
++	public Category findCategoryById(Long id, Long userId) throws CategoryNotFoundException
+ 	{
+-		return categoryRepository.findById(id).orElseThrow(CategoryNotFoundException::new);
++		Category category = userId == null ? null : categoryRepository.findByIdAndUserId(id, userId);
++		if(category == null)
++		{
++			throw new CategoryNotFoundException();
++		}
++		return category;
+ 	}
+ 
+ 	public Category findCategoryByNameAndUserId(String name, Long userId)
+diff --git a/src/main/java/ir/expense/tracker/makharej/service/ExpenseService.java b/src/main/java/ir/expense/tracker/makharej/service/ExpenseService.java
+index 4813b28..96953cf 100644
+--- a/src/main/java/ir/expense/tracker/makharej/service/ExpenseService.java
++++ b/src/main/java/ir/expense/tracker/makharej/service/ExpenseService.java
+@@ -16,9 +16,9 @@ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.stereotype.Service;
+ 
+-import javax.transaction.Transactional;
+-import javax.validation.Valid;
+-import javax.validation.constraints.NotNull;
++import jakarta.transaction.Transactional;
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.NotNull;
+ import java.util.List;
+ 
+ 
+@@ -57,16 +57,18 @@ public class ExpenseService {
+ 		return toExpenseResponse(expense);
+ 	}
+ 
+-	public ExpenseResponse updateExpense(@Valid @NotNull ExpenseUpdateRequest request) throws ExpenseNotFoundException, CategoryNotFoundException {
++	public ExpenseResponse updateExpense(@Valid @NotNull ExpenseUpdateRequest request, Long userId) throws ExpenseNotFoundException, CategoryNotFoundException {
+ 
+-		Expense expense = findExpenseById(request.getId());
++		Expense expense = findExpenseById(request.getId(), userId);
+ 		expense.setName(expense.getName());
+-		expense.setExpenseDate(request.getExpenseDate());
++		if(request.getExpenseDate() != null){
++			expense.setExpenseDate(request.getExpenseDate());
++		}
+ 		expense.setNote(request.getNote());
+ 		expense.setTag(request.getTag());
+ 		expense.setAmount(request.getAmount());
+ 		if(request.getCategoryId() != null){
+-			Category category = categoryService.findCategoryById(request.getCategoryId());
++			Category category = categoryService.findCategoryById(request.getCategoryId(), userId);
+ 			expense.setCategory(category);
+ 		}
+ 		expenseRepository.save(expense);
+@@ -74,23 +76,31 @@ public class ExpenseService {
+ 		return toExpenseResponse(expense);
+ 	}
+ 
+-	public ExpenseResponse deleteExpense(Long id) throws ExpenseNotFoundException {
++	public ExpenseResponse deleteExpense(Long id, Long userId) throws ExpenseNotFoundException {
+ 
+-		Expense expense = findExpenseById(id);
++		Expense expense = findExpenseById(id, userId);
+ 		expense.setEnable(null);
+ 		expenseRepository.save(expense);
+ 		log.info("expense {} is deleted.", expense.getId());
+ 		return toExpenseResponse(expense);
+ 	}
+ 
+-	public Expense findExpenseById(Long id) throws ExpenseNotFoundException
++	/**
++	 * Finds an expense of the given user. An expense that belongs to somebody else is reported as not found.
++	 */
++	public Expense findExpenseById(Long id, Long userId) throws ExpenseNotFoundException
+ 	{
+-		return expenseRepository.findById(id).orElseThrow(ExpenseNotFoundException::new);
++		Expense expense = userId == null ? null : expenseRepository.findByIdAndUserId(id, userId);
++		if(expense == null)
++		{
++			throw new ExpenseNotFoundException();
++		}
++		return expense;
+ 	}
+ 
+-	public ExpenseResponse findById(Long id) throws ExpenseNotFoundException
++	public ExpenseResponse findById(Long id, Long userId) throws ExpenseNotFoundException
+ 	{
+-		return toExpenseResponse(findExpenseById(id));
++		return toExpenseResponse(findExpenseById(id, userId));
+ 	}
+ 
+ 	public List<ExpenseResponse> findAll(ExpenseListRequest request)
+diff --git a/src/main/java/ir/expense/tracker/makharej/service/ReportService.java b/src/main/java/ir/expense/tracker/makharej/service/ReportService.java
+new file mode 100644
+index 0000000..60043b1
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/service/ReportService.java
+@@ -0,0 +1,120 @@
++package ir.expense.tracker.makharej.service;
++
++
++import ir.expense.tracker.makharej.dto.expense.ExpenseListRequest;
++import ir.expense.tracker.makharej.dto.report.ReportPeriod;
++import ir.expense.tracker.makharej.dto.report.ReportPeriodResponse;
++import ir.expense.tracker.makharej.dto.report.ReportRequest;
++import ir.expense.tracker.makharej.dto.report.ReportResponse;
++import ir.expense.tracker.makharej.entity.Expense;
++import ir.expense.tracker.makharej.repository.ExpenseRepository;
++import jakarta.transaction.Transactional;
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.NotNull;
++import lombok.RequiredArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.stereotype.Service;
++
++import java.math.BigDecimal;
++import java.time.Instant;
++import java.time.YearMonth;
++import java.time.ZoneId;
++import java.util.ArrayList;
++import java.util.Date;
++import java.util.List;
++import java.util.TreeMap;
++
++
++/**
++ * Monthly / yearly totals of the expenses of one user.
++ * <p>
++ * Months and years are calendar (Gregorian) ones, counted in Tehran time, the time zone the dates of the API are
++ * written in. Deleted expenses and expenses without a date are not part of a report.
++ */
++@Service
++@Slf4j
++@RequiredArgsConstructor
++@Transactional
++public class ReportService {
++
++	public static final ZoneId ZONE = ZoneId.of("Asia/Tehran");
++
++	private final ExpenseRepository expenseRepository;
++
++	public ReportResponse report(@Valid @NotNull ReportRequest request, Long userId) {
++
++		ReportPeriod period = request.getPeriod();
++		List<Expense> expenses = userId == null ? List.of() : expenseRepository.searchExpenses(toSearch(request, userId));
++
++		TreeMap<YearMonth, Totals> totalsByPeriod = new TreeMap<>();
++		Totals overall = new Totals();
++		for (Expense expense : expenses) {
++			if (!Boolean.TRUE.equals(expense.getEnable()) || expense.getExpenseDate() == null) {
++				continue;
++			}
++			Totals totals = totalsByPeriod.computeIfAbsent(bucketOf(expense.getExpenseDate(), period), key -> new Totals());
++			totals.add(expense.getAmount());
++			overall.add(expense.getAmount());
++		}
++
++		List<ReportPeriodResponse> periods = new ArrayList<>();
++		if (!totalsByPeriod.isEmpty()) {
++			YearMonth last = totalsByPeriod.lastKey();
++			for (YearMonth bucket = totalsByPeriod.firstKey(); !bucket.isAfter(last); bucket = next(bucket, period)) {
++				Totals totals = totalsByPeriod.getOrDefault(bucket, new Totals());
++				periods.add(ReportPeriodResponse.builder().period(label(bucket, period)).totalAmount(totals.amount()).count(totals.count).build());
++			}
++		}
++		return ReportResponse.builder().period(period).totalAmount(overall.amount()).count(overall.count).periods(periods).build();
++	}
++
++	private ExpenseListRequest toSearch(ReportRequest request, Long userId) {
++
++		ExpenseListRequest search = ExpenseListRequest.builder()
++													  .name(request.getName())
++													  .tag(request.getTag())
++													  .fromDate(request.getFromDate())
++													  .toDate(request.getToDate())
++													  .categoryId(request.getCategoryId())
++													  .build();
++		search.setUserId(userId);
++		return search;
++	}
++
++	/** Months and years are both kept as a YearMonth; a year is its January. */
++	private YearMonth bucketOf(Date date, ReportPeriod period) {
++
++		YearMonth month = YearMonth.from(Instant.ofEpochMilli(date.getTime()).atZone(ZONE));
++		return period == ReportPeriod.YEAR ? YearMonth.of(month.getYear(), 1) : month;
++	}
++
++	private YearMonth next(YearMonth bucket, ReportPeriod period) {
++
++		return period == ReportPeriod.YEAR ? bucket.plusYears(1) : bucket.plusMonths(1);
++	}
++
++	private String label(YearMonth bucket, ReportPeriod period) {
++
++		return period == ReportPeriod.YEAR ? String.valueOf(bucket.getYear()) : bucket.toString();
++	}
++
++	/** Adds up as BigDecimal so that 0.1 + 0.2 is 0.3. */
++	private static class Totals {
++
++		private BigDecimal sum = BigDecimal.ZERO;
++		private long count;
++
++		void add(Double amount) {
++
++			count++;
++			if (amount != null) {
++				sum = sum.add(BigDecimal.valueOf(amount));
++			}
++		}
++
++		Double amount() {
++
++			return sum.doubleValue();
++		}
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/service/TriggerService.java b/src/main/java/ir/expense/tracker/makharej/service/TriggerService.java
+new file mode 100644
+index 0000000..6800ee5
+--- /dev/null
++++ b/src/main/java/ir/expense/tracker/makharej/service/TriggerService.java
+@@ -0,0 +1,165 @@
++package ir.expense.tracker.makharej.service;
++
++
++import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
++import ir.expense.tracker.makharej.common.exception.TriggerNotFoundException;
++import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
++import ir.expense.tracker.makharej.dto.report.ReportPeriod;
++import ir.expense.tracker.makharej.dto.report.ReportRequest;
++import ir.expense.tracker.makharej.dto.report.ReportResponse;
++import ir.expense.tracker.makharej.dto.trigger.TriggerListRequest;
++import ir.expense.tracker.makharej.dto.trigger.TriggerRequest;
++import ir.expense.tracker.makharej.dto.trigger.TriggerResponse;
++import ir.expense.tracker.makharej.dto.trigger.TriggerUpdateRequest;
++import ir.expense.tracker.makharej.entity.Category;
++import ir.expense.tracker.makharej.entity.ExpenseTrigger;
++import ir.expense.tracker.makharej.entity.User;
++import ir.expense.tracker.makharej.repository.ExpenseTriggerRepository;
++import jakarta.transaction.Transactional;
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.NotNull;
++import lombok.RequiredArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.stereotype.Service;
++
++import java.math.BigDecimal;
++import java.time.Clock;
++import java.time.LocalDate;
++import java.time.YearMonth;
++import java.time.ZonedDateTime;
++import java.util.Date;
++import java.util.List;
++
++
++/**
++ * Budget triggers. A trigger is "the expenses that match these filters add up to more than this limit within the
++ * current month (or year)". Nothing is pushed anywhere: whether an alarm is going off is worked out whenever the
++ * trigger is read.
++ */
++@Service
++@Slf4j
++@RequiredArgsConstructor
++@Transactional
++public class TriggerService {
++
++	private final ExpenseTriggerRepository triggerRepository;
++	private final CategoryService categoryService;
++	private final UserService userService;
++	private final ReportService reportService;
++	private final Clock clock;
++
++	public TriggerResponse createTrigger(@Valid @NotNull TriggerRequest request, Long userId) throws CategoryNotFoundException, UserNotFoundException {
++
++		if(userId == null)
++		{
++			throw new UserNotFoundException();
++		}
++		Category category = findCategory(request.getCategoryId(), userId);
++		User user = userService.findUserById(userId);
++		ExpenseTrigger trigger = ExpenseTrigger.builder()
++											   .name(request.getName())
++											   .period(request.getPeriod())
++											   .limit(request.getLimit())
++											   .expenseName(request.getExpenseName())
++											   .tag(request.getTag())
++											   .category(category)
++											   .user(user)
++											   .build();
++		triggerRepository.save(trigger);
++		log.info("trigger {} is saved.", trigger.getId());
++		return toTriggerResponse(trigger, userId);
++	}
++
++	public TriggerResponse updateTrigger(@Valid @NotNull TriggerUpdateRequest request, Long userId) throws TriggerNotFoundException, CategoryNotFoundException {
++
++		ExpenseTrigger trigger = findTriggerById(request.getId(), userId);
++		trigger.setName(request.getName());
++		trigger.setPeriod(request.getPeriod());
++		trigger.setLimit(request.getLimit());
++		trigger.setExpenseName(request.getExpenseName());
++		trigger.setTag(request.getTag());
++		trigger.setCategory(findCategory(request.getCategoryId(), userId));
++		triggerRepository.save(trigger);
++		log.info("trigger {} is updated.", trigger.getId());
++		return toTriggerResponse(trigger, userId);
++	}
++
++	public TriggerResponse deleteTrigger(Long id, Long userId) throws TriggerNotFoundException {
++
++		ExpenseTrigger trigger = findTriggerById(id, userId);
++		trigger.setEnable(null);
++		triggerRepository.save(trigger);
++		log.info("trigger {} is deleted.", trigger.getId());
++		return toTriggerResponse(trigger, userId);
++	}
++
++	public TriggerResponse findById(Long id, Long userId) throws TriggerNotFoundException {
++
++		return toTriggerResponse(findTriggerById(id, userId), userId);
++	}
++
++	public List<TriggerResponse> find(@NotNull TriggerListRequest request, Long userId) {
++
++		if(userId == null)
++		{
++			return List.of();
++		}
++		return triggerRepository.findActiveByUserId(userId).stream()
++								.filter(trigger -> request.getName() == null || trigger.getName().contains(request.getName()))
++								.map(trigger -> toTriggerResponse(trigger, userId))
++								.filter(response -> request.getTriggered() == null || request.getTriggered().equals(response.getTriggered()))
++								.toList();
++	}
++
++	/**
++	 * Finds a trigger of the given user. A trigger that belongs to somebody else is reported as not found.
++	 */
++	public ExpenseTrigger findTriggerById(Long id, Long userId) throws TriggerNotFoundException {
++
++		ExpenseTrigger trigger = userId == null ? null : triggerRepository.findActiveByIdAndUserId(id, userId);
++		if(trigger == null)
++		{
++			throw new TriggerNotFoundException();
++		}
++		return trigger;
++	}
++
++	private Category findCategory(Long categoryId, Long userId) throws CategoryNotFoundException {
++
++		return categoryId == null ? null : categoryService.findCategoryById(categoryId, userId);
++	}
++
++	private TriggerResponse toTriggerResponse(ExpenseTrigger trigger, Long userId) {
++
++		ZonedDateTime now = ZonedDateTime.now(clock.withZone(ReportService.ZONE));
++		ReportPeriod period = trigger.getPeriod();
++		LocalDate firstDay = period == ReportPeriod.YEAR ? LocalDate.of(now.getYear(), 1, 1) : now.toLocalDate().withDayOfMonth(1);
++		ZonedDateTime start = firstDay.atStartOfDay(ReportService.ZONE);
++		ZonedDateTime end = period == ReportPeriod.YEAR ? start.plusYears(1) : start.plusMonths(1);
++
++		ReportRequest currentPeriod = ReportRequest.builder()
++												   .period(period)
++												   .name(trigger.getExpenseName())
++												   .tag(trigger.getTag())
++												   .categoryId(trigger.getCategory() == null ? null : trigger.getCategory().getId())
++												   .fromDate(Date.from(start.toInstant()))
++												   .toDate(Date.from(end.toInstant().minusMillis(1)))
++												   .build();
++		ReportResponse report = reportService.report(currentPeriod, userId);
++
++		Double amount = report.getTotalAmount();
++		boolean triggered = BigDecimal.valueOf(amount).compareTo(BigDecimal.valueOf(trigger.getLimit())) > 0;
++		return TriggerResponse.builder()
++							  .id(trigger.getId())
++							  .name(trigger.getName())
++							  .period(period)
++							  .limit(trigger.getLimit())
++							  .expenseName(trigger.getExpenseName())
++							  .tag(trigger.getTag())
++							  .categoryId(trigger.getCategory() == null ? null : trigger.getCategory().getId())
++							  .currentPeriod(period == ReportPeriod.YEAR ? String.valueOf(now.getYear()) : YearMonth.from(now).toString())
++							  .currentAmount(amount)
++							  .triggered(triggered)
++							  .build();
++	}
++}
+diff --git a/src/main/java/ir/expense/tracker/makharej/service/UserDetailServiceImpl.java b/src/main/java/ir/expense/tracker/makharej/service/UserDetailServiceImpl.java
+index 8781615..a42a1f5 100644
+--- a/src/main/java/ir/expense/tracker/makharej/service/UserDetailServiceImpl.java
++++ b/src/main/java/ir/expense/tracker/makharej/service/UserDetailServiceImpl.java
+@@ -4,6 +4,7 @@ package ir.expense.tracker.makharej.service;
+ import ir.expense.tracker.makharej.common.messages.ErrorMessages;
+ import ir.expense.tracker.makharej.entity.User;
+ import ir.expense.tracker.makharej.repository.UserRepository;
++import ir.expense.tracker.makharej.security.AppUserDetails;
+ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.security.core.userdetails.UserDetails;
+@@ -25,11 +26,11 @@ public class UserDetailServiceImpl implements UserDetailsService {
+ 	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+ 
+ 		User user = userRepository.findByUsername(username);
+-		if(user == null)
++		if(user == null || !Boolean.TRUE.equals(user.getEnable()))
+ 		{
+ 			log.error("user {} not found!", username);
+ 			throw new UsernameNotFoundException(ErrorMessages.USER_NOT_FOUND);
+ 		}
+-		return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), new ArrayList<>());
++		return new AppUserDetails(user.getId(), user.getUsername(), user.getPassword(), new ArrayList<>());
+ 	}
+ }
+diff --git a/src/main/java/ir/expense/tracker/makharej/service/UserService.java b/src/main/java/ir/expense/tracker/makharej/service/UserService.java
+index a193749..4f8bc46 100644
+--- a/src/main/java/ir/expense/tracker/makharej/service/UserService.java
++++ b/src/main/java/ir/expense/tracker/makharej/service/UserService.java
+@@ -16,16 +16,16 @@ import ir.expense.tracker.makharej.repository.UserRepository;
+ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.security.core.userdetails.UserDetails;
+ import org.springframework.security.core.userdetails.UserDetailsService;
+ import org.springframework.security.core.userdetails.UsernameNotFoundException;
+ import org.springframework.security.crypto.password.PasswordEncoder;
+ import org.springframework.stereotype.Service;
+ 
+-import javax.validation.Valid;
+-import javax.validation.constraints.NotNull;
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.NotNull;
+ import java.util.ArrayList;
+-import java.util.List;
+ import java.util.stream.Collectors;
+ 
+ 
+@@ -38,6 +38,13 @@ public class UserService {
+ 	private final PasswordEncoder encoder;
+ 	public UserResponse createUser(@Valid @NotNull UserRequest request) {
+ 
++		// The database only rejects a name that is used by an active user ((username, enable) is unique and enable is
++		// null once a user is deleted). A deleted user's name must stay taken: two rows with one username break login,
++		// and tokens carry the username, so the old user's tokens would otherwise act as whoever registers it next.
++		if(userRepository.existsByUsername(request.getUsername()))
++		{
++			throw new DataIntegrityViolationException("username " + request.getUsername() + " is already taken");
++		}
+ 		User user = User.builder()
+ 				.username(request.getUsername())
+ 				.name(request.getName())
+@@ -48,17 +55,32 @@ public class UserService {
+ 		return toUserResponse(user);
+ 	}
+ 
+-	public UserResponse deleteUser(Long id) throws UserNotFoundException {
++	/**
++	 * A user can only delete himself. Anybody else is reported as not found.
++	 */
++	public UserResponse deleteUser(Long id, Long callerId) throws UserNotFoundException {
+ 
+-		User user = findUserById(id);
++		User user = findUserById(id, callerId);
+ 		user.setEnable(null);
+ 		userRepository.save(user);
+ 		log.info("user {} is deleted.", user.getId());
+ 		return toUserResponse(user);
+ 	}
+ 
+-	public UserResponse findById(Long id) throws UserNotFoundException {
+-		return toUserResponse(findUserById(id));
++	/**
++	 * A user can only look at himself. Anybody else is reported as not found.
++	 */
++	public UserResponse findById(Long id, Long callerId) throws UserNotFoundException {
++		return toUserResponse(findUserById(id, callerId));
++	}
++
++	private User findUserById(Long id, Long callerId) throws UserNotFoundException
++	{
++		if(callerId == null || !callerId.equals(id))
++		{
++			throw new UserNotFoundException();
++		}
++		return findUserById(id);
+ 	}
+ 	public User findUserById(Long id) throws UserNotFoundException
+ 	{
+@@ -69,11 +91,6 @@ public class UserService {
+ 		return userRepository.findByUsername(username);
+ 	}
+ 
+-	public List<UserResponse> findAllUsers()
+-	{
+-		return userRepository.findAll().stream().map(user -> toUserResponse(user)).toList();
+-	}
+-
+ 	private UserResponse toUserResponse(User user)
+ 	{
+ 		return UserResponse.builder().id(user.getId()).name(user.getName()).username(user.getUsername()).build();
+diff --git a/src/main/resources/application.yml b/src/main/resources/application.yml
+index 5430a67..d98cd7c 100644
+--- a/src/main/resources/application.yml
++++ b/src/main/resources/application.yml
+@@ -9,6 +9,13 @@ spring:
+   jpa:
+     hibernate:
+       ddl-auto: update
++    properties:
++      hibernate:
++        id:
++          # Hibernate 6 defaults to one "<entity>_seq" sequence per entity (allocating blocks of 50).
++          # Keep the Hibernate 5 behaviour (a single shared "hibernate_sequence", increment 1) so that
++          # existing databases keep working and ids keep being allocated the same way.
++          db_structure_naming_strategy: legacy
+   mvc:
+     pathmatch:
+       matching-strategy: ant_path_matcher
+diff --git a/src/test/java/ir/expense/tracker/makharej/ApiBehaviorTest.java b/src/test/java/ir/expense/tracker/makharej/ApiBehaviorTest.java
+new file mode 100644
+index 0000000..aef915b
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/ApiBehaviorTest.java
+@@ -0,0 +1,187 @@
++package ir.expense.tracker.makharej;
++
++
++import com.fasterxml.jackson.databind.JsonNode;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.server.LocalServerPort;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.test.context.ActiveProfiles;
++
++import java.net.URI;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.util.UUID;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++
++/**
++ * Talks to the running application over HTTP and pins down behaviour that is easy to lose when upgrading
++ * Spring Boot / Spring Security / Hibernate (it was all verified against the Spring Boot 2.7 version).
++ * Runs against the in-memory HSQLDB of the "test" profile.
++ */
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++@ActiveProfiles("test")
++class ApiBehaviorTest {
++
++	private static final String JSON = "application/json";
++
++	@LocalServerPort
++	private int port;
++
++	@Autowired
++	private JdbcTemplate jdbcTemplate;
++
++	private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
++	private final ObjectMapper objectMapper = new ObjectMapper();
++
++	@Test
++	void loginReturnsAJwtThatAuthenticatesLaterCalls() throws Exception {
++
++		String token = signupAndLogin();
++
++		assertThat(token.split("\\.")).hasSize(3);
++		HttpResponse<String> response = send("POST", "/api/category/find", token, "{}");
++		assertThat(response.statusCode()).isEqualTo(200);
++		assertThat(response.body()).isEqualTo("[]");
++	}
++
++	@Test
++	void entitiesAreOwnedByTheLoggedInUser() throws Exception {
++
++		String owner = signupAndLogin();
++		String someoneElse = signupAndLogin();
++
++		HttpResponse<String> created = send("POST", "/api/category", owner, "{\"name\":\"food\"}");
++		assertThat(created.statusCode()).isEqualTo(201);
++		assertThat(send("POST", "/api/category/find", owner, "{\"name\":\"food\"}").body()).contains("\"name\":\"food\"");
++		assertThat(send("POST", "/api/category/find", someoneElse, "{\"name\":\"food\"}").body()).isEqualTo("[]");
++	}
++
++	@Test
++	void allEntitiesDrawTheirIdFromOneSharedSequence() {
++
++		Integer sharedSequences = jdbcTemplate.queryForObject(
++				"select count(*) from information_schema.sequences where upper(sequence_name) = 'HIBERNATE_SEQUENCE'", Integer.class);
++		Integer perEntitySequences = jdbcTemplate.queryForObject(
++				"select count(*) from information_schema.sequences where upper(sequence_name) like '%\\_SEQ' escape '\\'", Integer.class);
++
++		assertThat(sharedSequences).isEqualTo(1);
++		assertThat(perEntitySequences).isZero();
++	}
++
++	@Test
++	void requestsWithoutAValidTokenGet401WithAnEmptyBody() throws Exception {
++
++		HttpResponse<String> noToken = send("GET", "/api/category?id=1", null, null);
++		HttpResponse<String> badToken = send("GET", "/api/category?id=1", "abc.def.ghi", null);
++
++		assertThat(noToken.statusCode()).isEqualTo(401);
++		assertThat(noToken.body()).isEmpty();
++		assertThat(badToken.statusCode()).isEqualTo(401);
++		assertThat(badToken.body()).isEmpty();
++	}
++
++	@Test
++	void unknownPathsOfAuthenticatedUsersGetTheBootErrorJson() throws Exception {
++
++		HttpResponse<String> response = send("GET", "/api/does-not-exist", signupAndLogin(), null);
++
++		assertThat(response.statusCode()).isEqualTo(404);
++		JsonNode body = objectMapper.readTree(response.body());
++		assertThat(body.get("status").asInt()).isEqualTo(404);
++		assertThat(body.get("error").asText()).isEqualTo("Not Found");
++		assertThat(body.get("path").asText()).isEqualTo("/api/does-not-exist");
++	}
++
++	@Test
++	void domainAndValidationErrorsKeepTheirShape() throws Exception {
++
++		String token = signupAndLogin();
++
++		HttpResponse<String> invalid = send("POST", "/api/category", token, "{}");
++		assertThat(invalid.statusCode()).isEqualTo(400);
++		assertThat(objectMapper.readTree(invalid.body()).get("name").asText()).isEqualTo("name cannot be null/empty!");
++
++		HttpResponse<String> notFound = send("GET", "/api/category?id=99999", token, null);
++		assertThat(notFound.statusCode()).isEqualTo(400);
++		JsonNode body = objectMapper.readTree(notFound.body());
++		assertThat(body.get("statusCode").asText()).isEqualTo("BAD_REQUEST");
++		assertThat(body.get("message").asText()).isEqualTo("category not found!");
++	}
++
++	@Test
++	void frameworkErrorsHaveNoBody() throws Exception {
++
++		String token = signupAndLogin();
++
++		HttpResponse<String> malformed = send("POST", "/api/category", token, "{not json");
++		HttpResponse<String> missingParameter = send("GET", "/api/category", token, null);
++		HttpResponse<String> wrongMethod = send("GET", "/api/auth/signup", null, null);
++
++		assertThat(malformed.statusCode()).isEqualTo(400);
++		assertThat(malformed.body()).isEmpty();
++		assertThat(missingParameter.statusCode()).isEqualTo(400);
++		assertThat(missingParameter.body()).isEmpty();
++		assertThat(wrongMethod.statusCode()).isEqualTo(405);
++		assertThat(wrongMethod.body()).isEmpty();
++	}
++
++	@Test
++	void trailingSlashStillMatches() throws Exception {
++
++		String token = signupAndLogin();
++		long id = objectMapper.readTree(send("POST", "/api/category", token, "{\"name\":\"slash\"}").body()).get("id").asLong();
++
++		assertThat(send("GET", "/api/category/?id=" + id, token, null).statusCode()).isEqualTo(200);
++		assertThat(send("POST", "/api/category/find/", token, "{\"name\":\"slash\"}").statusCode()).isEqualTo(200);
++		assertThat(send("POST", "/api/auth/login/", null, "{\"username\":\"nobody\",\"password\":\"x\"}").statusCode()).isNotEqualTo(404);
++	}
++
++	@Test
++	void onlyJsonIsSpoken() throws Exception {
++
++		String token = signupAndLogin();
++		long id = objectMapper.readTree(send("POST", "/api/category", token, "{\"name\":\"yaml\"}").body()).get("id").asLong();
++
++		HttpRequest yamlResponse = request("GET", "/api/category?id=" + id, token, null, JSON).header("Accept", "application/yaml").build();
++		HttpRequest yamlRequest = request("POST", "/api/auth/signup", null, "name: a\nusername: b\npassword: c\n", "application/yaml").build();
++
++		assertThat(http.send(yamlResponse, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(406);
++		assertThat(http.send(yamlRequest, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(415);
++	}
++
++	private String signupAndLogin() throws Exception {
++
++		String username = "user-" + UUID.randomUUID();
++		String credentials = "{\"username\":\"" + username + "\",\"password\":\"secret\"}";
++
++		HttpResponse<String> signup = send("POST", "/api/auth/signup", null, "{\"name\":\"Some One\",\"username\":\"" + username + "\",\"password\":\"secret\"}");
++		assertThat(signup.statusCode()).isEqualTo(200);
++		HttpResponse<String> login = send("POST", "/api/auth/login", null, credentials);
++		assertThat(login.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(login.body()).get("token").asText();
++	}
++
++	private HttpResponse<String> send(String method, String path, String token, String body) throws Exception {
++
++		return http.send(request(method, path, token, body, JSON).build(), HttpResponse.BodyHandlers.ofString());
++	}
++
++	private HttpRequest.Builder request(String method, String path, String token, String body, String contentType) {
++
++		HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
++												 .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
++		if (body != null) {
++			builder.header("Content-Type", contentType);
++		}
++		if (token != null) {
++			builder.header("Authorization", "Bearer " + token);
++		}
++		return builder;
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/DeletedUserTest.java b/src/test/java/ir/expense/tracker/makharej/DeletedUserTest.java
+new file mode 100644
+index 0000000..9e94917
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/DeletedUserTest.java
+@@ -0,0 +1,132 @@
++package ir.expense.tracker.makharej;
++
++
++import com.fasterxml.jackson.databind.ObjectMapper;
++import ir.expense.tracker.makharej.repository.UserRepository;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.server.LocalServerPort;
++import org.springframework.test.context.ActiveProfiles;
++
++import java.net.URI;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.util.UUID;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++
++/**
++ * A user who deleted his account must not be able to keep using the application.
++ */
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++@ActiveProfiles("test")
++class DeletedUserTest {
++
++	@LocalServerPort
++	private int port;
++
++	@Autowired
++	private UserRepository userRepository;
++
++	private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
++	private final ObjectMapper objectMapper = new ObjectMapper();
++
++	private String username;
++	private String token;
++	private long userId;
++
++	private String otherUsername;
++	private String otherToken;
++
++	@BeforeEach
++	void createAndDeleteAUser() throws Exception {
++
++		otherUsername = "other-" + UUID.randomUUID();
++		signup(otherUsername);
++		otherToken = token(login(otherUsername));
++
++		username = "deleted-" + UUID.randomUUID();
++		userId = signup(username);
++		token = token(login(username));
++		assertThat(send("POST", "/api/category/find", token, "{}").statusCode()).isEqualTo(200);
++
++		HttpResponse<String> deletion = send("DELETE", "/api/user?id=" + userId, token, null);
++		assertThat(deletion.statusCode()).isEqualTo(200);
++	}
++
++	@Test
++	void theTokenStopsWorking() throws Exception {
++
++		HttpResponse<String> response = send("POST", "/api/category/find", token, "{}");
++
++		assertThat(response.statusCode()).isEqualTo(401);
++		assertThat(response.body()).isEmpty();
++	}
++
++	@Test
++	void loginIsRefusedLikeForAnUnknownUser() throws Exception {
++
++		HttpResponse<String> deletedUser = login(username);
++		HttpResponse<String> unknownUser = login("nobody-" + UUID.randomUUID());
++
++		assertThat(deletedUser.statusCode()).isEqualTo(unknownUser.statusCode()).isNotEqualTo(200);
++		assertThat(deletedUser.body()).isEqualTo(unknownUser.body()).doesNotContain("token");
++	}
++
++	@Test
++	void theUsernameCannotBeRegisteredAgain() throws Exception {
++
++		HttpResponse<String> signup = send("POST", "/api/auth/signup", null, signupJson(username));
++
++		assertThat(signup.statusCode()).isEqualTo(500);
++		assertThat(userRepository.findAll().stream().filter(user -> username.equals(user.getUsername()))).hasSize(1);
++		assertThat(login(username).statusCode()).isNotEqualTo(200);
++	}
++
++	@Test
++	void otherUsersAreNotAffected() throws Exception {
++
++		assertThat(send("POST", "/api/category/find", otherToken, "{}").statusCode()).isEqualTo(200);
++		assertThat(login(otherUsername).statusCode()).isEqualTo(200);
++	}
++
++	private long signup(String name) throws Exception {
++
++		HttpResponse<String> response = send("POST", "/api/auth/signup", null, signupJson(name));
++		assertThat(response.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(response.body()).get("id").asLong();
++	}
++
++	private HttpResponse<String> login(String name) throws Exception {
++
++		return send("POST", "/api/auth/login", null, "{\"username\":\"" + name + "\",\"password\":\"secret\"}");
++	}
++
++	private String token(HttpResponse<String> login) throws Exception {
++
++		assertThat(login.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(login.body()).get("token").asText();
++	}
++
++	private String signupJson(String name) {
++
++		return "{\"name\":\"Some One\",\"username\":\"" + name + "\",\"password\":\"secret\"}";
++	}
++
++	private HttpResponse<String> send(String method, String path, String token, String body) throws Exception {
++
++		HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
++												 .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
++		if (body != null) {
++			builder.header("Content-Type", "application/json");
++		}
++		if (token != null) {
++			builder.header("Authorization", "Bearer " + token);
++		}
++		return http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/ExpenseDateTest.java b/src/test/java/ir/expense/tracker/makharej/ExpenseDateTest.java
+new file mode 100644
+index 0000000..d269952
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/ExpenseDateTest.java
+@@ -0,0 +1,146 @@
++package ir.expense.tracker.makharej;
++
++
++import com.fasterxml.jackson.databind.JsonNode;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.server.LocalServerPort;
++import org.springframework.test.context.ActiveProfiles;
++
++import java.net.URI;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.time.Instant;
++import java.time.OffsetDateTime;
++import java.util.UUID;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++
++/**
++ * Dates are written in Tehran time (UTC+03:30). Updating an expense has to read them exactly like creating one does.
++ */
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++@ActiveProfiles("test")
++class ExpenseDateTest {
++
++	@LocalServerPort
++	private int port;
++
++	private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
++	private final ObjectMapper objectMapper = new ObjectMapper();
++
++	private String token;
++	private long category;
++	private long expense;
++
++	@BeforeEach
++	void createAnExpense() throws Exception {
++
++		token = signupAndLogin();
++		category = idOf(send("POST", "/api/category", "{\"name\":\"food\"}"));
++		String body = "{\"name\":\"lunch\",\"amount\":10,\"expenseDate\":\"2023-05-03 12:12:12\",\"categoryId\":" + category + ",\"tag\":\"#daily\",\"note\":\"n\"}";
++		HttpResponse<String> created = send("POST", "/api/expense", body);
++		assertThat(created.statusCode()).isEqualTo(201);
++		assertThat(dateOf(created)).isEqualTo(Instant.parse("2023-05-03T08:42:12Z"));
++		expense = idOf(created);
++	}
++
++	@Test
++	void updateReadsTheDateLikeCreateDoes() throws Exception {
++
++		HttpResponse<String> updated = update("{\"id\":" + expense + ",\"amount\":10,\"expenseDate\":\"2024-06-07 08:09:10\"}");
++
++		assertThat(updated.statusCode()).isEqualTo(200);
++		assertThat(dateOf(updated)).isEqualTo(Instant.parse("2024-06-07T04:39:10Z"));
++		assertThat(dateOf(send("GET", "/api/expense?id=" + expense, null))).isEqualTo(Instant.parse("2024-06-07T04:39:10Z"));
++	}
++
++	@Test
++	void updateStillAcceptsTheDateWithoutSeconds() throws Exception {
++
++		HttpResponse<String> updated = update("{\"id\":" + expense + ",\"amount\":10,\"expenseDate\":\"2024-06-07 08:09\"}");
++
++		assertThat(updated.statusCode()).isEqualTo(200);
++		assertThat(dateOf(updated)).isEqualTo(Instant.parse("2024-06-07T04:39:00Z"));
++	}
++
++	@Test
++	void updatedExpenseIsFoundInTheRightDateRange() throws Exception {
++
++		update("{\"id\":" + expense + ",\"amount\":10,\"expenseDate\":\"2024-06-07 08:09:10\"}");
++
++		String june = "{\"fromDate\":\"2024-06-01 00:00:00\",\"toDate\":\"2024-06-30 23:59:59\"}";
++		String may2023 = "{\"fromDate\":\"2023-05-01 00:00:00\",\"toDate\":\"2023-05-31 23:59:59\"}";
++		assertThat(send("POST", "/api/expense/find", june).body()).contains("\"id\":" + expense);
++		assertThat(send("POST", "/api/expense/find", may2023).body()).isEqualTo("[]");
++	}
++
++	@Test
++	void updateWithoutADateKeepsTheDate() throws Exception {
++
++		HttpResponse<String> updated = update("{\"id\":" + expense + ",\"amount\":99}");
++
++		assertThat(updated.statusCode()).isEqualTo(200);
++		assertThat(dateOf(updated)).isEqualTo(Instant.parse("2023-05-03T08:42:12Z"));
++		assertThat(dateOf(send("GET", "/api/expense?id=" + expense, null))).isEqualTo(Instant.parse("2023-05-03T08:42:12Z"));
++	}
++
++	@Test
++	void updateRefusesADateThatIsNotOne() throws Exception {
++
++		assertThat(update("{\"id\":" + expense + ",\"expenseDate\":\"yesterday\"}").statusCode()).isEqualTo(400);
++		assertThat(update("{\"id\":" + expense + ",\"expenseDate\":\"2024-02-30 10:00:00\"}").statusCode()).isEqualTo(400);
++		assertThat(dateOf(send("GET", "/api/expense?id=" + expense, null))).isEqualTo(Instant.parse("2023-05-03T08:42:12Z"));
++	}
++
++	private HttpResponse<String> update(String body) throws Exception {
++
++		return send("PATCH", "/api/expense", body);
++	}
++
++	private Instant dateOf(HttpResponse<String> response) throws Exception {
++
++		JsonNode date = objectMapper.readTree(response.body()).get("expenseDate");
++		assertThat(date.isNull()).as("expenseDate in " + response.body()).isFalse();
++		return OffsetDateTime.parse(date.asText()).toInstant();
++	}
++
++	private long idOf(HttpResponse<String> response) throws Exception {
++
++		assertThat(response.statusCode()).isIn(200, 201);
++		return objectMapper.readTree(response.body()).get("id").asLong();
++	}
++
++	private String signupAndLogin() throws Exception {
++
++		String username = "user-" + UUID.randomUUID();
++		String signup = "{\"name\":\"Some One\",\"username\":\"" + username + "\",\"password\":\"secret\"}";
++		HttpResponse<String> signedUp = http.send(request("POST", "/api/auth/signup", null, signup).build(), HttpResponse.BodyHandlers.ofString());
++		assertThat(signedUp.statusCode()).isEqualTo(200);
++		HttpResponse<String> login = http.send(request("POST", "/api/auth/login", null, "{\"username\":\"" + username + "\",\"password\":\"secret\"}").build(), HttpResponse.BodyHandlers.ofString());
++		assertThat(login.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(login.body()).get("token").asText();
++	}
++
++	private HttpResponse<String> send(String method, String path, String body) throws Exception {
++
++		return http.send(request(method, path, token, body).build(), HttpResponse.BodyHandlers.ofString());
++	}
++
++	private HttpRequest.Builder request(String method, String path, String token, String body) {
++
++		HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
++												 .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
++		if (body != null) {
++			builder.header("Content-Type", "application/json");
++		}
++		if (token != null) {
++			builder.header("Authorization", "Bearer " + token);
++		}
++		return builder;
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/OwnershipTest.java b/src/test/java/ir/expense/tracker/makharej/OwnershipTest.java
+new file mode 100644
+index 0000000..c659096
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/OwnershipTest.java
+@@ -0,0 +1,271 @@
++package ir.expense.tracker.makharej;
++
++
++import com.fasterxml.jackson.databind.JsonNode;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import ir.expense.tracker.makharej.repository.UserRepository;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.beans.factory.annotation.Qualifier;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.server.LocalServerPort;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
++
++import java.net.URI;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.util.Set;
++import java.util.UUID;
++import java.util.stream.Collectors;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++
++/**
++ * A user may only see and change their own categories and expenses. Somebody else's id must look exactly like an
++ * id that does not exist.
++ */
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++@ActiveProfiles("test")
++class OwnershipTest {
++
++	private static final String CATEGORY_NOT_FOUND = "{\"statusCode\":\"BAD_REQUEST\",\"message\":\"category not found!\"}";
++	private static final String EXPENSE_NOT_FOUND = "{\"statusCode\":\"BAD_REQUEST\",\"message\":\"expense not found!\"}";
++
++	private static final String USER_NOT_FOUND = "{\"statusCode\":\"BAD_REQUEST\",\"message\":\"user not found!\"}";
++
++	@LocalServerPort
++	private int port;
++
++	@Autowired
++	private UserRepository userRepository;
++
++	@Autowired
++	@Qualifier("requestMappingHandlerMapping")
++	private RequestMappingHandlerMapping handlerMapping;
++
++	private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
++	private final ObjectMapper objectMapper = new ObjectMapper();
++
++	private String owner;
++	private String attacker;
++	private long ownerId;
++	private long attackerId;
++	private long categoryId;
++	private long expenseId;
++	private long attackerCategoryId;
++
++	@BeforeEach
++	void createDataForTwoUsers() throws Exception {
++
++		String ownerName = "owner-" + UUID.randomUUID();
++		String attackerName = "attacker-" + UUID.randomUUID();
++		ownerId = idOf(send("POST", "/api/auth/signup", null, signupJson(ownerName)));
++		attackerId = idOf(send("POST", "/api/auth/signup", null, signupJson(attackerName)));
++		owner = login(ownerName);
++		attacker = login(attackerName);
++		categoryId = idOf(send("POST", "/api/category", owner, "{\"name\":\"food\"}"));
++		expenseId = idOf(send("POST", "/api/expense", owner, expenseJson("lunch", categoryId)));
++		attackerCategoryId = idOf(send("POST", "/api/category", attacker, "{\"name\":\"mine\"}"));
++	}
++
++	@Test
++	void otherUsersCategoryCannotBeRead() throws Exception {
++
++		HttpResponse<String> response = send("GET", "/api/category?id=" + categoryId, attacker, null);
++
++		assertThat(response.statusCode()).isEqualTo(400);
++		assertThat(response.body()).isEqualTo(CATEGORY_NOT_FOUND);
++	}
++
++	@Test
++	void otherUsersCategoryCannotBeUpdated() throws Exception {
++
++		HttpResponse<String> response = send("PATCH", "/api/category", attacker, "{\"id\":" + categoryId + ",\"name\":\"hacked\"}");
++
++		assertThat(response.statusCode()).isEqualTo(400);
++		assertThat(response.body()).isEqualTo(CATEGORY_NOT_FOUND);
++		assertThat(send("GET", "/api/category?id=" + categoryId, owner, null).body()).contains("\"name\":\"food\"");
++	}
++
++	@Test
++	void otherUsersCategoryCannotBeDeleted() throws Exception {
++
++		HttpResponse<String> response = send("DELETE", "/api/category?id=" + categoryId, attacker, null);
++
++		assertThat(response.statusCode()).isEqualTo(400);
++		assertThat(response.body()).isEqualTo(CATEGORY_NOT_FOUND);
++		assertThat(send("POST", "/api/category/find", owner, "{\"name\":\"food\"}").body()).contains("\"name\":\"food\"");
++	}
++
++	@Test
++	void otherUsersExpenseCannotBeRead() throws Exception {
++
++		HttpResponse<String> response = send("GET", "/api/expense?id=" + expenseId, attacker, null);
++
++		assertThat(response.statusCode()).isEqualTo(400);
++		assertThat(response.body()).isEqualTo(EXPENSE_NOT_FOUND);
++	}
++
++	@Test
++	void otherUsersExpenseCannotBeUpdated() throws Exception {
++
++		String update = "{\"id\":" + expenseId + ",\"name\":\"hacked\",\"amount\":1.0,\"tag\":\"hacked\",\"note\":\"hacked\",\"expenseDate\":\"2024-06-07 08:09\",\"categoryId\":" + attackerCategoryId + "}";
++
++		HttpResponse<String> response = send("PATCH", "/api/expense", attacker, update);
++
++		assertThat(response.statusCode()).isEqualTo(400);
++		assertThat(response.body()).isEqualTo(EXPENSE_NOT_FOUND);
++		JsonNode untouched = objectMapper.readTree(send("GET", "/api/expense?id=" + expenseId, owner, null).body());
++		assertThat(untouched.get("tag").asText()).isEqualTo("#daily");
++		assertThat(untouched.get("categoryId").asLong()).isEqualTo(categoryId);
++	}
++
++	@Test
++	void otherUsersExpenseCannotBeDeleted() throws Exception {
++
++		HttpResponse<String> response = send("DELETE", "/api/expense?id=" + expenseId, attacker, null);
++
++		assertThat(response.statusCode()).isEqualTo(400);
++		assertThat(response.body()).isEqualTo(EXPENSE_NOT_FOUND);
++		assertThat(send("POST", "/api/expense/find", owner, "{}").body()).contains("\"id\":" + expenseId);
++	}
++
++	@Test
++	void ownExpenseCannotBeMovedIntoOtherUsersCategory() throws Exception {
++
++		String move = "{\"id\":" + expenseId + ",\"categoryId\":" + attackerCategoryId + "}";
++
++		HttpResponse<String> response = send("PATCH", "/api/expense", owner, move);
++
++		assertThat(response.statusCode()).isEqualTo(400);
++		assertThat(response.body()).isEqualTo(CATEGORY_NOT_FOUND);
++		assertThat(objectMapper.readTree(send("GET", "/api/expense?id=" + expenseId, owner, null).body()).get("categoryId").asLong()).isEqualTo(categoryId);
++	}
++
++	@Test
++	void searchesStayScopedEvenIfTheBodyNamesAnotherUser() throws Exception {
++
++		assertThat(send("POST", "/api/expense/find", attacker, "{\"userId\":" + ownerId + "}").body()).isEqualTo("[]");
++		assertThat(send("POST", "/api/category/find", attacker, "{\"name\":\"food\",\"userId\":" + ownerId + "}").body()).isEqualTo("[]");
++		assertThat(send("POST", "/api/category", attacker, "{\"name\":\"spoof\",\"userId\":" + (ownerId - 1) + "}").statusCode()).isEqualTo(201);
++		assertThat(send("POST", "/api/category/find", owner, "{\"name\":\"spoof\"}").body()).isEqualTo("[]");
++	}
++
++	@Test
++	void otherUserCannotBeDeleted() throws Exception {
++
++		HttpResponse<String> response = send("DELETE", "/api/user?id=" + ownerId, attacker, null);
++
++		assertThat(response.statusCode()).isEqualTo(400);
++		assertThat(response.body()).isEqualTo(USER_NOT_FOUND);
++		assertThat(userRepository.findById(ownerId).orElseThrow().getEnable()).isTrue();
++	}
++
++	@Test
++	void otherUserLooksExactlyLikeAUserThatDoesNotExist() throws Exception {
++
++		HttpResponse<String> someoneElse = send("GET", "/api/user?id=" + ownerId, attacker, null);
++		HttpResponse<String> nobody = send("GET", "/api/user?id=99999999", attacker, null);
++
++		assertThat(someoneElse.statusCode()).isEqualTo(400);
++		assertThat(someoneElse.body()).isEqualTo(USER_NOT_FOUND);
++		assertThat(nobody.statusCode()).isEqualTo(someoneElse.statusCode());
++		assertThat(nobody.body()).isEqualTo(someoneElse.body());
++	}
++
++	@Test
++	void aUserCanReadHimself() throws Exception {
++
++		HttpResponse<String> response = send("GET", "/api/user?id=" + ownerId, owner, null);
++
++		assertThat(response.statusCode()).isEqualTo(200);
++		JsonNode body = objectMapper.readTree(response.body());
++		assertThat(body.get("id").asLong()).isEqualTo(ownerId);
++		assertThat(body.get("username").asText()).startsWith("owner-");
++		assertThat(body.has("password")).isFalse();
++	}
++
++	@Test
++	void aUserCanDeleteHimself() throws Exception {
++
++		HttpResponse<String> response = send("DELETE", "/api/user?id=" + attackerId, attacker, null);
++
++		assertThat(response.statusCode()).isEqualTo(200);
++		assertThat(objectMapper.readTree(response.body()).get("id").asLong()).isEqualTo(attackerId);
++		assertThat(userRepository.findById(attackerId).orElseThrow().getEnable()).isNull();
++		assertThat(userRepository.findById(ownerId).orElseThrow().getEnable()).isTrue();
++	}
++
++	@Test
++	void thereIsNoWayToListAllUsers() throws Exception {
++
++		Set<String> mappedPaths = handlerMapping.getHandlerMethods().keySet().stream()
++												.flatMap(mapping -> mapping.getDirectPaths().stream())
++												.collect(Collectors.toSet());
++
++		assertThat(mappedPaths).contains("/api/user");
++		assertThat(mappedPaths).doesNotContain("/api/user/find/all");
++	}
++
++	@Test
++	void theOwnerCanStillReadUpdateAndDelete() throws Exception {
++
++		assertThat(send("GET", "/api/category?id=" + categoryId, owner, null).statusCode()).isEqualTo(200);
++		assertThat(send("PATCH", "/api/category", owner, "{\"id\":" + categoryId + ",\"name\":\"groceries\"}").body()).contains("\"name\":\"groceries\"");
++		assertThat(send("GET", "/api/expense?id=" + expenseId, owner, null).statusCode()).isEqualTo(200);
++		long secondCategory = idOf(send("POST", "/api/category", owner, "{\"name\":\"travel\"}"));
++		String update = "{\"id\":" + expenseId + ",\"amount\":7.5,\"categoryId\":" + secondCategory + "}";
++		JsonNode updated = objectMapper.readTree(send("PATCH", "/api/expense", owner, update).body());
++		assertThat(updated.get("amount").asDouble()).isEqualTo(7.5);
++		assertThat(updated.get("categoryId").asLong()).isEqualTo(secondCategory);
++		assertThat(send("DELETE", "/api/expense?id=" + expenseId, owner, null).statusCode()).isEqualTo(200);
++		assertThat(send("DELETE", "/api/category?id=" + secondCategory, owner, null).statusCode()).isEqualTo(200);
++	}
++
++	private String expenseJson(String name, long category) {
++
++		return "{\"name\":\"" + name + "\",\"amount\":12.5,\"expenseDate\":\"2023-05-03 12:12:12\",\"categoryId\":" + category + ",\"tag\":\"#daily\",\"note\":\"n\"}";
++	}
++
++	private String signupJson(String username) {
++
++		return "{\"name\":\"Some One\",\"username\":\"" + username + "\",\"password\":\"secret\"}";
++	}
++
++	private String signupAndLogin() throws Exception {
++
++		String username = "user-" + UUID.randomUUID();
++		assertThat(send("POST", "/api/auth/signup", null, signupJson(username)).statusCode()).isEqualTo(200);
++		return login(username);
++	}
++
++	private String login(String username) throws Exception {
++
++		HttpResponse<String> login = send("POST", "/api/auth/login", null, "{\"username\":\"" + username + "\",\"password\":\"secret\"}");
++		assertThat(login.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(login.body()).get("token").asText();
++	}
++
++	private long idOf(HttpResponse<String> response) throws Exception {
++
++		assertThat(response.statusCode()).isIn(200, 201);
++		return objectMapper.readTree(response.body()).get("id").asLong();
++	}
++
++	private HttpResponse<String> send(String method, String path, String token, String body) throws Exception {
++
++		HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
++												 .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
++		if (body != null) {
++			builder.header("Content-Type", "application/json");
++		}
++		if (token != null) {
++			builder.header("Authorization", "Bearer " + token);
++		}
++		return http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/ReportApiTest.java b/src/test/java/ir/expense/tracker/makharej/ReportApiTest.java
+new file mode 100644
+index 0000000..4fc7ac1
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/ReportApiTest.java
+@@ -0,0 +1,194 @@
++package ir.expense.tracker.makharej;
++
++
++import com.fasterxml.jackson.databind.JsonNode;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.server.LocalServerPort;
++import org.springframework.test.context.ActiveProfiles;
++
++import java.net.URI;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.UUID;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++@ActiveProfiles("test")
++class ReportApiTest {
++
++	@LocalServerPort
++	private int port;
++
++	private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
++	private final ObjectMapper objectMapper = new ObjectMapper();
++
++	private String token;
++	private long food;
++	private long travel;
++
++	@BeforeEach
++	void createExpenses() throws Exception {
++
++		token = signupAndLogin();
++		food = createCategory(token, "food");
++		travel = createCategory(token, "travel");
++		createExpense(token, "lunch", 100.5, "2023-01-15 10:00:00", food, "#daily");
++		createExpense(token, "taxi", 50.0, "2023-01-20 10:00:00", travel, "#trip");
++		createExpense(token, "dinner", 20.0, "2023-03-01 10:00:00", food, "#daily");
++		createExpense(token, "coffee", 10.0, "2024-06-01 10:00:00", food, "#daily");
++		long mistake = createExpense(token, "mistake", 1000.0, "2023-01-25 10:00:00", food, "#daily");
++		assertThat(send("DELETE", "/api/expense?id=" + mistake, token, null).statusCode()).isEqualTo(200);
++	}
++
++	@Test
++	void monthlyReportListsEveryMonthBetweenTheFirstAndTheLastExpense() throws Exception {
++
++		JsonNode report = report(token, "{\"period\":\"MONTH\"}");
++
++		assertThat(report.get("period").asText()).isEqualTo("MONTH");
++		assertThat(report.get("totalAmount").asDouble()).isEqualTo(180.5);
++		assertThat(report.get("count").asLong()).isEqualTo(4);
++		List<String> months = labels(report);
++		assertThat(months).hasSize(18).startsWith("2023-01", "2023-02", "2023-03", "2023-04").endsWith("2024-05", "2024-06");
++		assertThat(entry(report, "2023-01").get("totalAmount").asDouble()).isEqualTo(150.5);
++		assertThat(entry(report, "2023-01").get("count").asLong()).isEqualTo(2);
++		assertThat(entry(report, "2023-02").get("totalAmount").asDouble()).isEqualTo(0.0);
++		assertThat(entry(report, "2023-02").get("count").asLong()).isEqualTo(0);
++		assertThat(entry(report, "2023-03").get("totalAmount").asDouble()).isEqualTo(20.0);
++		assertThat(entry(report, "2024-06").get("totalAmount").asDouble()).isEqualTo(10.0);
++	}
++
++	@Test
++	void yearlyReport() throws Exception {
++
++		JsonNode report = report(token, "{\"period\":\"YEAR\"}");
++
++		assertThat(labels(report)).containsExactly("2023", "2024");
++		assertThat(entry(report, "2023").get("totalAmount").asDouble()).isEqualTo(170.5);
++		assertThat(entry(report, "2023").get("count").asLong()).isEqualTo(3);
++		assertThat(entry(report, "2024").get("totalAmount").asDouble()).isEqualTo(10.0);
++	}
++
++	@Test
++	void filtersWorkLikeInTheExpenseSearch() throws Exception {
++
++		JsonNode byCategory = report(token, "{\"period\":\"YEAR\",\"categoryId\":" + travel + "}");
++		JsonNode byTag = report(token, "{\"period\":\"YEAR\",\"tag\":\"daily\"}");
++		JsonNode byName = report(token, "{\"period\":\"YEAR\",\"name\":\"lunch\"}");
++		JsonNode byDates = report(token, "{\"period\":\"MONTH\",\"fromDate\":\"2023-01-16 00:00:00\",\"toDate\":\"2023-12-31 23:59:59\"}");
++
++		assertThat(byCategory.get("totalAmount").asDouble()).isEqualTo(50.0);
++		assertThat(labels(byCategory)).containsExactly("2023");
++		assertThat(byTag.get("totalAmount").asDouble()).isEqualTo(130.5);
++		assertThat(byName.get("totalAmount").asDouble()).isEqualTo(100.5);
++		assertThat(byDates.get("totalAmount").asDouble()).isEqualTo(70.0);
++		assertThat(labels(byDates)).containsExactly("2023-01", "2023-02", "2023-03");
++	}
++
++	@Test
++	void aReportOnlyCoversTheExpensesOfTheCaller() throws Exception {
++
++		String other = signupAndLogin();
++		assertThat(report(other, "{\"period\":\"YEAR\"}").get("periods")).isEmpty();
++		long otherCategory = createCategory(other, "mine");
++		createExpense(other, "secret", 777.0, "2023-01-15 10:00:00", otherCategory, "#x");
++
++		JsonNode othersReport = report(other, "{\"period\":\"YEAR\"}");
++		JsonNode myReportForTheirCategory = report(token, "{\"period\":\"YEAR\",\"categoryId\":" + otherCategory + "}");
++
++		assertThat(othersReport.get("totalAmount").asDouble()).isEqualTo(777.0);
++		assertThat(report(token, "{\"period\":\"YEAR\"}").get("totalAmount").asDouble()).isEqualTo(180.5);
++		assertThat(myReportForTheirCategory.get("periods")).isEmpty();
++		assertThat(myReportForTheirCategory.get("totalAmount").asDouble()).isEqualTo(0.0);
++	}
++
++	@Test
++	void thePeriodIsRequired() throws Exception {
++
++		HttpResponse<String> missing = send("POST", "/api/report", token, "{}");
++		HttpResponse<String> unknown = send("POST", "/api/report", token, "{\"period\":\"WEEK\"}");
++
++		assertThat(missing.statusCode()).isEqualTo(400);
++		assertThat(objectMapper.readTree(missing.body()).get("period").asText()).isEqualTo("period cannot be null!");
++		assertThat(unknown.statusCode()).isEqualTo(400);
++	}
++
++	@Test
++	void aLoginIsRequired() throws Exception {
++
++		HttpResponse<String> response = send("POST", "/api/report", null, "{\"period\":\"YEAR\"}");
++
++		assertThat(response.statusCode()).isEqualTo(401);
++		assertThat(response.body()).isEmpty();
++	}
++
++	private JsonNode report(String token, String body) throws Exception {
++
++		HttpResponse<String> response = send("POST", "/api/report", token, body);
++		assertThat(response.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(response.body());
++	}
++
++	private List<String> labels(JsonNode report) {
++
++		List<String> labels = new ArrayList<>();
++		report.get("periods").forEach(period -> labels.add(period.get("period").asText()));
++		return labels;
++	}
++
++	private JsonNode entry(JsonNode report, String label) {
++
++		for (JsonNode period : report.get("periods")) {
++			if (label.equals(period.get("period").asText())) {
++				return period;
++			}
++		}
++		throw new AssertionError("no period " + label + " in " + report);
++	}
++
++	private long createCategory(String token, String name) throws Exception {
++
++		HttpResponse<String> response = send("POST", "/api/category", token, "{\"name\":\"" + name + "\"}");
++		assertThat(response.statusCode()).isEqualTo(201);
++		return objectMapper.readTree(response.body()).get("id").asLong();
++	}
++
++	private long createExpense(String token, String name, double amount, String date, long category, String tag) throws Exception {
++
++		String body = "{\"name\":\"" + name + "\",\"amount\":" + amount + ",\"expenseDate\":\"" + date + "\",\"categoryId\":" + category + ",\"tag\":\"" + tag + "\"}";
++		HttpResponse<String> response = send("POST", "/api/expense", token, body);
++		assertThat(response.statusCode()).isEqualTo(201);
++		return objectMapper.readTree(response.body()).get("id").asLong();
++	}
++
++	private String signupAndLogin() throws Exception {
++
++		String username = "user-" + UUID.randomUUID();
++		String signup = "{\"name\":\"Some One\",\"username\":\"" + username + "\",\"password\":\"secret\"}";
++		assertThat(send("POST", "/api/auth/signup", null, signup).statusCode()).isEqualTo(200);
++		HttpResponse<String> login = send("POST", "/api/auth/login", null, "{\"username\":\"" + username + "\",\"password\":\"secret\"}");
++		assertThat(login.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(login.body()).get("token").asText();
++	}
++
++	private HttpResponse<String> send(String method, String path, String token, String body) throws Exception {
++
++		HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
++												 .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
++		if (body != null) {
++			builder.header("Content-Type", "application/json");
++		}
++		if (token != null) {
++			builder.header("Authorization", "Bearer " + token);
++		}
++		return http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/TriggerApiTest.java b/src/test/java/ir/expense/tracker/makharej/TriggerApiTest.java
+new file mode 100644
+index 0000000..43028f6
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/TriggerApiTest.java
+@@ -0,0 +1,211 @@
++package ir.expense.tracker.makharej;
++
++
++import com.fasterxml.jackson.databind.JsonNode;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.server.LocalServerPort;
++import org.springframework.test.context.ActiveProfiles;
++
++import java.net.URI;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.time.LocalDate;
++import java.time.YearMonth;
++import java.time.ZoneId;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.UUID;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++@ActiveProfiles("test")
++class TriggerApiTest {
++
++	private static final ZoneId TEHRAN = ZoneId.of("Asia/Tehran");
++	private static final String TRIGGER_NOT_FOUND = "{\"statusCode\":\"BAD_REQUEST\",\"message\":\"trigger not found!\"}";
++
++	@LocalServerPort
++	private int port;
++
++	private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
++	private final ObjectMapper objectMapper = new ObjectMapper();
++
++	private String token;
++	private long coffee;
++	private long trigger;
++
++	private final String thisMonth = YearMonth.now(TEHRAN).toString();
++	private final String aDayThisMonth = LocalDate.now(TEHRAN).withDayOfMonth(1) + " 12:00:00";
++	private final String aDayLastYear = LocalDate.now(TEHRAN).withDayOfMonth(1).minusYears(1) + " 12:00:00";
++
++	@BeforeEach
++	void createTrigger() throws Exception {
++
++		token = signupAndLogin();
++		coffee = idOf(send("POST", "/api/category", token, "{\"name\":\"coffee\"}"));
++		String body = "{\"name\":\"too much coffee\",\"period\":\"MONTH\",\"limit\":50,\"tag\":\"coffee\",\"categoryId\":" + coffee + "}";
++		HttpResponse<String> created = send("POST", "/api/trigger", token, body);
++		assertThat(created.statusCode()).isEqualTo(201);
++		trigger = objectMapper.readTree(created.body()).get("id").asLong();
++	}
++
++	@Test
++	void theAlarmGoesOffWhenTheMonthGetsTooExpensive() throws Exception {
++
++		JsonNode quiet = get(trigger);
++		assertThat(quiet.get("currentPeriod").asText()).isEqualTo(thisMonth);
++		assertThat(quiet.get("currentAmount").asDouble()).isEqualTo(0.0);
++		assertThat(quiet.get("triggered").asBoolean()).isFalse();
++
++		long first = expense(token, "latte", 30.0, aDayThisMonth, coffee, "coffee");
++		assertThat(get(trigger).get("currentAmount").asDouble()).isEqualTo(30.0);
++		assertThat(get(trigger).get("triggered").asBoolean()).isFalse();
++
++		expense(token, "espresso", 30.0, aDayThisMonth, coffee, "coffee");
++		JsonNode loud = get(trigger);
++		assertThat(loud.get("currentAmount").asDouble()).isEqualTo(60.0);
++		assertThat(loud.get("triggered").asBoolean()).isTrue();
++		assertThat(ids(find(token, "{\"triggered\":true}"))).containsExactly(trigger);
++		assertThat(ids(find(token, "{\"triggered\":false}"))).isEmpty();
++
++		assertThat(send("DELETE", "/api/expense?id=" + first, token, null).statusCode()).isEqualTo(200);
++		assertThat(get(trigger).get("currentAmount").asDouble()).isEqualTo(30.0);
++		assertThat(get(trigger).get("triggered").asBoolean()).isFalse();
++	}
++
++	@Test
++	void onlyMatchingExpensesOfTheCurrentPeriodCount() throws Exception {
++
++		expense(token, "latte", 30.0, aDayThisMonth, coffee, "coffee");
++		expense(token, "old latte", 500.0, aDayLastYear, coffee, "coffee");
++		expense(token, "taxi", 500.0, aDayThisMonth, coffee, "taxi");
++		assertThat(get(trigger).get("currentAmount").asDouble()).isEqualTo(30.0);
++
++		String yearly = "{\"name\":\"coffee year\",\"period\":\"YEAR\",\"limit\":1000,\"categoryId\":" + coffee + "}";
++		long yearlyId = idOf(send("POST", "/api/trigger", token, yearly));
++		JsonNode year = get(yearlyId);
++		assertThat(year.get("currentPeriod").asText()).isEqualTo(String.valueOf(YearMonth.now(TEHRAN).getYear()));
++		assertThat(year.get("currentAmount").asDouble()).isEqualTo(530.0);
++	}
++
++	@Test
++	void aTriggerCanBeChangedAndDeleted() throws Exception {
++
++		expense(token, "latte", 30.0, aDayThisMonth, coffee, "coffee");
++
++		String update = "{\"id\":" + trigger + ",\"name\":\"stricter\",\"period\":\"MONTH\",\"limit\":20,\"tag\":\"coffee\"}";
++		JsonNode updated = objectMapper.readTree(send("PATCH", "/api/trigger", token, update).body());
++		assertThat(updated.get("name").asText()).isEqualTo("stricter");
++		assertThat(updated.get("limit").asDouble()).isEqualTo(20.0);
++		assertThat(updated.get("triggered").asBoolean()).isTrue();
++		assertThat(updated.get("categoryId").isNull()).isTrue();
++
++		assertThat(send("DELETE", "/api/trigger?id=" + trigger, token, null).statusCode()).isEqualTo(200);
++		HttpResponse<String> gone = send("GET", "/api/trigger?id=" + trigger, token, null);
++		assertThat(gone.statusCode()).isEqualTo(400);
++		assertThat(gone.body()).isEqualTo(TRIGGER_NOT_FOUND);
++		assertThat(find(token, "{}")).isEmpty();
++	}
++
++	@Test
++	void triggersBelongToTheirOwner() throws Exception {
++
++		String other = signupAndLogin();
++
++		assertThat(send("GET", "/api/trigger?id=" + trigger, other, null).body()).isEqualTo(TRIGGER_NOT_FOUND);
++		assertThat(send("DELETE", "/api/trigger?id=" + trigger, other, null).body()).isEqualTo(TRIGGER_NOT_FOUND);
++		String update = "{\"id\":" + trigger + ",\"name\":\"mine now\",\"period\":\"MONTH\",\"limit\":1}";
++		assertThat(send("PATCH", "/api/trigger", other, update).body()).isEqualTo(TRIGGER_NOT_FOUND);
++		assertThat(find(other, "{}")).isEmpty();
++		assertThat(get(trigger).get("name").asText()).isEqualTo("too much coffee");
++
++		String withForeignCategory = "{\"name\":\"sneaky\",\"period\":\"MONTH\",\"limit\":1,\"categoryId\":" + coffee + "}";
++		HttpResponse<String> sneaky = send("POST", "/api/trigger", other, withForeignCategory);
++		assertThat(sneaky.statusCode()).isEqualTo(400);
++		assertThat(sneaky.body()).contains("category not found!");
++	}
++
++	@Test
++	void theRuleIsValidated() throws Exception {
++
++		HttpResponse<String> empty = send("POST", "/api/trigger", token, "{}");
++		HttpResponse<String> zero = send("POST", "/api/trigger", token, "{\"name\":\"x\",\"period\":\"MONTH\",\"limit\":0}");
++
++		assertThat(empty.statusCode()).isEqualTo(400);
++		JsonNode errors = objectMapper.readTree(empty.body());
++		assertThat(errors.get("name").asText()).isEqualTo("name cannot be null/empty!");
++		assertThat(errors.get("period").asText()).isEqualTo("period cannot be null!");
++		assertThat(errors.get("limit").asText()).isEqualTo("limit cannot be null!");
++		assertThat(zero.statusCode()).isEqualTo(400);
++		assertThat(objectMapper.readTree(zero.body()).get("limit").asText()).isEqualTo("limit must be greater than zero!");
++	}
++
++	@Test
++	void aLoginIsRequired() throws Exception {
++
++		assertThat(send("GET", "/api/trigger?id=" + trigger, null, null).statusCode()).isEqualTo(401);
++		assertThat(send("POST", "/api/trigger/find", null, "{}").statusCode()).isEqualTo(401);
++	}
++
++	private JsonNode get(long id) throws Exception {
++
++		HttpResponse<String> response = send("GET", "/api/trigger?id=" + id, token, null);
++		assertThat(response.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(response.body());
++	}
++
++	private JsonNode find(String token, String body) throws Exception {
++
++		HttpResponse<String> response = send("POST", "/api/trigger/find", token, body);
++		assertThat(response.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(response.body());
++	}
++
++	private List<Long> ids(JsonNode triggers) {
++
++		List<Long> ids = new ArrayList<>();
++		triggers.forEach(node -> ids.add(node.get("id").asLong()));
++		return ids;
++	}
++
++	private long expense(String token, String name, double amount, String date, long category, String tag) throws Exception {
++
++		String body = "{\"name\":\"" + name + "\",\"amount\":" + amount + ",\"expenseDate\":\"" + date + "\",\"categoryId\":" + category + ",\"tag\":\"" + tag + "\"}";
++		return idOf(send("POST", "/api/expense", token, body));
++	}
++
++	private long idOf(HttpResponse<String> response) throws Exception {
++
++		assertThat(response.statusCode()).isIn(200, 201);
++		return objectMapper.readTree(response.body()).get("id").asLong();
++	}
++
++	private String signupAndLogin() throws Exception {
++
++		String username = "user-" + UUID.randomUUID();
++		String signup = "{\"name\":\"Some One\",\"username\":\"" + username + "\",\"password\":\"secret\"}";
++		assertThat(send("POST", "/api/auth/signup", null, signup).statusCode()).isEqualTo(200);
++		HttpResponse<String> login = send("POST", "/api/auth/login", null, "{\"username\":\"" + username + "\",\"password\":\"secret\"}");
++		assertThat(login.statusCode()).isEqualTo(200);
++		return objectMapper.readTree(login.body()).get("token").asText();
++	}
++
++	private HttpResponse<String> send(String method, String path, String token, String body) throws Exception {
++
++		HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
++												 .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
++		if (body != null) {
++			builder.header("Content-Type", "application/json");
++		}
++		if (token != null) {
++			builder.header("Authorization", "Bearer " + token);
++		}
++		return http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/common/util/TehranDateTimeDeserializerTest.java b/src/test/java/ir/expense/tracker/makharej/common/util/TehranDateTimeDeserializerTest.java
+new file mode 100644
+index 0000000..fd5acf1
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/common/util/TehranDateTimeDeserializerTest.java
+@@ -0,0 +1,61 @@
++package ir.expense.tracker.makharej.common.util;
++
++
++import com.fasterxml.jackson.databind.JsonMappingException;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import ir.expense.tracker.makharej.dto.expense.ExpenseUpdateRequest;
++import org.assertj.core.api.Assertions;
++import org.junit.jupiter.api.Test;
++
++import java.time.Instant;
++import java.util.Date;
++
++
++public class TehranDateTimeDeserializerTest {
++
++	private final ObjectMapper objectMapper = new ObjectMapper();
++
++	@Test
++	public void dateWithSecondsIsTehranTime() throws Exception {
++
++		Assertions.assertThat(read("\"2024-06-07 08:09:10\"")).isEqualTo(Date.from(Instant.parse("2024-06-07T04:39:10Z")));
++	}
++
++	@Test
++	public void dateWithoutSecondsIsTehranTime() throws Exception {
++
++		Assertions.assertThat(read("\"2024-06-07 08:09\"")).isEqualTo(Date.from(Instant.parse("2024-06-07T04:39:00Z")));
++	}
++
++	@Test
++	public void surroundingSpacesAreIgnored() throws Exception {
++
++		Assertions.assertThat(read("\" 2024-06-07 08:09:10 \"")).isEqualTo(Date.from(Instant.parse("2024-06-07T04:39:10Z")));
++	}
++
++	@Test
++	public void numberIsEpochMilliseconds() throws Exception {
++
++		Assertions.assertThat(read("1717735150000")).isEqualTo(new Date(1717735150000L));
++	}
++
++	@Test
++	public void missingOrNullDateStaysNull() throws Exception {
++
++		Assertions.assertThat(read("null")).isNull();
++		Assertions.assertThat(objectMapper.readValue("{\"id\":1}", ExpenseUpdateRequest.class).getExpenseDate()).isNull();
++	}
++
++	@Test
++	public void somethingThatIsNotADateIsRefused() {
++
++		for (String text : new String[] { "\"yesterday\"", "\"2024-02-30 10:00:00\"", "\"2024-13-01 10:00:00\"", "\"03/05/2023\"", "\"\"", "\"2024-06-07\"", "true" }) {
++			Assertions.assertThatThrownBy(() -> read(text)).as(text).isInstanceOf(JsonMappingException.class);
++		}
++	}
++
++	private Date read(String json) throws Exception {
++
++		return objectMapper.readValue("{\"id\":1,\"expenseDate\":" + json + "}", ExpenseUpdateRequest.class).getExpenseDate();
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/service/CategoryServiceTest.java b/src/test/java/ir/expense/tracker/makharej/service/CategoryServiceTest.java
+index 8260d5e..f4102ea 100644
+--- a/src/test/java/ir/expense/tracker/makharej/service/CategoryServiceTest.java
++++ b/src/test/java/ir/expense/tracker/makharej/service/CategoryServiceTest.java
+@@ -19,8 +19,6 @@ import org.mockito.Mock;
+ import org.mockito.Mockito;
+ import org.mockito.junit.jupiter.MockitoExtension;
+ 
+-import java.util.Optional;
+-
+ 
+ @ExtendWith(MockitoExtension.class)
+ public class CategoryServiceTest {
+@@ -69,19 +67,19 @@ public class CategoryServiceTest {
+ 	@Test
+ 	public void findCategoryByIdOk() throws CategoryNotFoundException {
+ 		Category category = Category.builder().name(categoryRequest.getName()).build();
+-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.of(category));
++		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(category);
+ 
+-		Category categoryById = categoryService.findCategoryById(123L);
++		Category categoryById = categoryService.findCategoryById(123L, userId);
+ 
+ 		Assertions.assertThat(categoryById.getName()).isEqualTo(category.getName());
+ 	}
+ 
+ 	@Test
+ 	public void findCategoryByIdNotFound() throws CategoryNotFoundException {
+-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
++		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(null);
+ 
+ 		Assertions.assertThatThrownBy(() -> {
+-			categoryService.findCategoryById(123L);
++			categoryService.findCategoryById(123L, userId);
+ 		}).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
+ 
+ 	}
+@@ -90,10 +88,10 @@ public class CategoryServiceTest {
+ 	public void updateCategoryIdNotFound() throws CategoryNotFoundException {
+ 
+ 		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123L).name("updatedCategoryName").build();
+-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
++		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(null);
+ 
+ 		Assertions.assertThatThrownBy(() -> {
+-			categoryService.updateCategory(request);
++			categoryService.updateCategory(request, userId);
+ 		}).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
+ 
+ 	}
+@@ -103,9 +101,9 @@ public class CategoryServiceTest {
+ 
+ 		Category category = Category.builder().name(categoryRequest.getName()).build();
+ 		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123L).name("updatedCategoryName").build();
+-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(category));
++		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(category);
+ 
+-		CategoryResponse updatedCategory = categoryService.updateCategory(request);
++		CategoryResponse updatedCategory = categoryService.updateCategory(request, userId);
+ 		Assertions.assertThat(updatedCategory.getName()).isEqualTo(category.getName());
+ 
+ 	}
+@@ -113,10 +111,10 @@ public class CategoryServiceTest {
+ 	@Test
+ 	public void deleteCategoryIdNotFound() throws CategoryNotFoundException {
+ 
+-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
++		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(null);
+ 
+ 		Assertions.assertThatThrownBy(() -> {
+-			categoryService.deleteCategory(123L);
++			categoryService.deleteCategory(123L, userId);
+ 		}).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
+ 
+ 	}
+@@ -125,10 +123,35 @@ public class CategoryServiceTest {
+ 	public void deleteCategoryOk() throws CategoryNotFoundException {
+ 
+ 		Category category = Category.builder().name(categoryRequest.getName()).build();
+-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(category));
++		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(category);
+ 
+-		CategoryResponse deletedCategory = categoryService.deleteCategory(123L);
++		CategoryResponse deletedCategory = categoryService.deleteCategory(123L, userId);
+ 		Assertions.assertThat(deletedCategory.getName()).isEqualTo(category.getName());
+ 
+ 	}
++
++	@Test
++	public void categoryOfAnotherUserIsNotFound() {
++
++		Long anotherUserId = 444L;
++		Category category = Category.builder().name(categoryRequest.getName()).user(user).build();
++		Mockito.when(categoryRepository.findByIdAndUserId(123L, anotherUserId)).thenReturn(null);
++		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123L).name("hijacked").build();
++
++		Assertions.assertThatThrownBy(() -> categoryService.findById(123L, anotherUserId)).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
++		Assertions.assertThatThrownBy(() -> categoryService.updateCategory(request, anotherUserId)).isInstanceOf(CategoryNotFoundException.class);
++		Assertions.assertThatThrownBy(() -> categoryService.deleteCategory(123L, anotherUserId)).isInstanceOf(CategoryNotFoundException.class);
++
++		Mockito.verify(categoryRepository, Mockito.times(3)).findByIdAndUserId(123L, anotherUserId);
++		Mockito.verify(categoryRepository, Mockito.never()).findById(Mockito.any());
++		Mockito.verify(categoryRepository, Mockito.never()).save(Mockito.any());
++	}
++
++	@Test
++	public void unknownCallerCanNotFindAnyCategory() {
++
++		Assertions.assertThatThrownBy(() -> categoryService.findCategoryById(123L, null)).isInstanceOf(CategoryNotFoundException.class);
++
++		Mockito.verifyNoInteractions(categoryRepository);
++	}
+ }
+diff --git a/src/test/java/ir/expense/tracker/makharej/service/ExpenseServiceTest.java b/src/test/java/ir/expense/tracker/makharej/service/ExpenseServiceTest.java
+index 22d30c8..6cdca55 100644
+--- a/src/test/java/ir/expense/tracker/makharej/service/ExpenseServiceTest.java
++++ b/src/test/java/ir/expense/tracker/makharej/service/ExpenseServiceTest.java
+@@ -26,7 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
+ 
+ import java.util.Calendar;
+ import java.util.Date;
+-import java.util.Optional;
+ 
+ import static org.junit.jupiter.api.Assertions.*;
+ 
+@@ -89,11 +88,11 @@ public class ExpenseServiceTest {
+ 		category.setId(categoryId);
+ 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
+ 
+-		Mockito.when(categoryService.findCategoryById(categoryId)).thenReturn(category);
++		Mockito.when(categoryService.findCategoryById(categoryId, userId)).thenReturn(category);
+ 		Mockito.when(expenseRepository.save(Mockito.any())).thenReturn(expense);
+-		Mockito.when(expenseRepository.findById(expenseId)).thenReturn(Optional.ofNullable(expense));
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
+ 
+-		ExpenseResponse expenseResponse = expenseService.updateExpense(request);
++		ExpenseResponse expenseResponse = expenseService.updateExpense(request, userId);
+ 
+ 		Assertions.assertThat(name).isEqualTo(expenseResponse.getName());
+ 		Assertions.assertThat(note).isEqualTo(expenseResponse.getNote());
+@@ -111,10 +110,10 @@ public class ExpenseServiceTest {
+ 		category.setId(categoryId);
+ 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
+ 
+-		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(null);
+ 
+ 		Assertions.assertThatThrownBy(() -> {
+-			expenseService.updateExpense(request);
++			expenseService.updateExpense(request, userId);
+ 		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
+ 	}
+ 
+@@ -126,9 +125,9 @@ public class ExpenseServiceTest {
+ 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
+ 
+ 		Mockito.when(expenseRepository.save(Mockito.any())).thenReturn(expense);
+-		Mockito.when(expenseRepository.findById(expenseId)).thenReturn(Optional.ofNullable(expense));
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
+ 
+-		ExpenseResponse expenseResponse = expenseService.deleteExpense(123L);
++		ExpenseResponse expenseResponse = expenseService.deleteExpense(123L, userId);
+ 
+ 		Assertions.assertThat(name).isEqualTo(expenseResponse.getName());
+ 		Assertions.assertThat(note).isEqualTo(expenseResponse.getNote());
+@@ -141,10 +140,10 @@ public class ExpenseServiceTest {
+ 	@Test
+ 	public void deleteExpenseIdNotFound() throws ExpenseNotFoundException {
+ 
+-		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(null);
+ 
+ 		Assertions.assertThatThrownBy(() -> {
+-			expenseService.deleteExpense(123L);
++			expenseService.deleteExpense(123L, userId);
+ 		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
+ 	}
+ 
+@@ -155,9 +154,9 @@ public class ExpenseServiceTest {
+ 		category.setId(categoryId);
+ 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
+ 
+-		Mockito.when(expenseRepository.findById(expenseId)).thenReturn(Optional.ofNullable(expense));
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
+ 
+-		ExpenseResponse expenseResponse = expenseService.findById(123L);
++		ExpenseResponse expenseResponse = expenseService.findById(123L, userId);
+ 
+ 		Assertions.assertThat(name).isEqualTo(expenseResponse.getName());
+ 		Assertions.assertThat(note).isEqualTo(expenseResponse.getNote());
+@@ -171,10 +170,66 @@ public class ExpenseServiceTest {
+ 	@Test
+ 	public void findByIdNotFound() throws ExpenseNotFoundException {
+ 
+-		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(null);
+ 
+ 		Assertions.assertThatThrownBy(() -> {
+-			expenseService.findById(123L);
++			expenseService.findById(123L, userId);
+ 		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
+ 	}
++
++	@Test
++	public void expenseOfAnotherUserIsNotFound() {
++
++		Long anotherUserId = 444L;
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, anotherUserId)).thenReturn(null);
++		ExpenseUpdateRequest request = ExpenseUpdateRequest.builder().id(expenseId).name("hijacked").amount(1.0).build();
++
++		Assertions.assertThatThrownBy(() -> expenseService.findById(expenseId, anotherUserId)).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
++		Assertions.assertThatThrownBy(() -> expenseService.updateExpense(request, anotherUserId)).isInstanceOf(ExpenseNotFoundException.class);
++		Assertions.assertThatThrownBy(() -> expenseService.deleteExpense(expenseId, anotherUserId)).isInstanceOf(ExpenseNotFoundException.class);
++
++		Mockito.verify(expenseRepository, Mockito.times(3)).findByIdAndUserId(expenseId, anotherUserId);
++		Mockito.verify(expenseRepository, Mockito.never()).findById(Mockito.any());
++		Mockito.verify(expenseRepository, Mockito.never()).save(Mockito.any());
++	}
++
++	@Test
++	public void expenseCannotBeMovedIntoACategoryOfAnotherUser() throws CategoryNotFoundException {
++
++		Category category = Category.builder().name("sampleCategoryName").build();
++		category.setId(categoryId);
++		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
++		ExpenseUpdateRequest request = ExpenseUpdateRequest.builder().id(expenseId).categoryId(999L).build();
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
++		Mockito.when(categoryService.findCategoryById(999L, userId)).thenThrow(new CategoryNotFoundException());
++
++		Assertions.assertThatThrownBy(() -> expenseService.updateExpense(request, userId)).isInstanceOf(CategoryNotFoundException.class);
++
++		Mockito.verify(expenseRepository, Mockito.never()).save(Mockito.any());
++		Assertions.assertThat(expense.getCategory()).isSameAs(category);
++	}
++
++	@Test
++	public void unknownCallerCanNotFindAnyExpense() {
++
++		Assertions.assertThatThrownBy(() -> expenseService.findExpenseById(expenseId, null)).isInstanceOf(ExpenseNotFoundException.class);
++
++		Mockito.verifyNoInteractions(expenseRepository);
++	}
++
++	@Test
++	public void updateWithoutADateKeepsTheDate() throws CategoryNotFoundException, ExpenseNotFoundException {
++
++		Category category = Category.builder().name("sampleCategoryName").build();
++		category.setId(categoryId);
++		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
++		ExpenseUpdateRequest request = ExpenseUpdateRequest.builder().id(expenseId).amount(7.5).build();
++		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
++
++		ExpenseResponse response = expenseService.updateExpense(request, userId);
++
++		Assertions.assertThat(response.getExpenseDate()).isEqualTo(expenseDate);
++		Assertions.assertThat(expense.getExpenseDate()).isEqualTo(expenseDate);
++		Assertions.assertThat(response.getAmount()).isEqualTo(7.5);
++	}
+ }
+diff --git a/src/test/java/ir/expense/tracker/makharej/service/ReportServiceTest.java b/src/test/java/ir/expense/tracker/makharej/service/ReportServiceTest.java
+new file mode 100644
+index 0000000..2a7c0a5
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/service/ReportServiceTest.java
+@@ -0,0 +1,196 @@
++package ir.expense.tracker.makharej.service;
++
++
++import ir.expense.tracker.makharej.dto.expense.ExpenseListRequest;
++import ir.expense.tracker.makharej.dto.report.ReportPeriod;
++import ir.expense.tracker.makharej.dto.report.ReportPeriodResponse;
++import ir.expense.tracker.makharej.dto.report.ReportRequest;
++import ir.expense.tracker.makharej.dto.report.ReportResponse;
++import ir.expense.tracker.makharej.entity.Expense;
++import ir.expense.tracker.makharej.repository.ExpenseRepository;
++import org.assertj.core.api.Assertions;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.Mock;
++import org.mockito.Mockito;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.time.Instant;
++import java.util.Date;
++import java.util.List;
++
++
++@ExtendWith(MockitoExtension.class)
++public class ReportServiceTest {
++
++	private static final Long USER_ID = 333L;
++
++	@Mock
++	private ExpenseRepository expenseRepository;
++	private ReportService reportService;
++
++	@BeforeEach
++	public void setup()
++	{
++		reportService = new ReportService(expenseRepository);
++	}
++
++	@Test
++	public void monthsAreTehranMonths() {
++
++		// Tehran is UTC+03:30 all year: 20:00Z is still the 31st there, 21:00Z is already the 1st of the next month.
++		givenExpenses(
++				expense("2023-01-31T20:00:00Z", 10.0),
++				expense("2023-01-31T21:00:00Z", 5.0));
++
++		ReportResponse report = reportService.report(request(ReportPeriod.MONTH), USER_ID);
++
++		Assertions.assertThat(report.getPeriods()).extracting(ReportPeriodResponse::getPeriod).containsExactly("2023-01", "2023-02");
++		Assertions.assertThat(report.getPeriods()).extracting(ReportPeriodResponse::getTotalAmount).containsExactly(10.0, 5.0);
++	}
++
++	@Test
++	public void yearsAreTehranYears() {
++
++		givenExpenses(
++				expense("2022-12-31T20:29:59Z", 1.0),
++				expense("2022-12-31T20:30:00Z", 2.0),
++				expense("2023-07-01T00:00:00Z", 4.0));
++
++		ReportResponse report = reportService.report(request(ReportPeriod.YEAR), USER_ID);
++
++		Assertions.assertThat(report.getPeriod()).isEqualTo(ReportPeriod.YEAR);
++		Assertions.assertThat(report.getPeriods()).extracting(ReportPeriodResponse::getPeriod).containsExactly("2022", "2023");
++		Assertions.assertThat(report.getPeriods()).extracting(ReportPeriodResponse::getTotalAmount).containsExactly(1.0, 6.0);
++		Assertions.assertThat(report.getPeriods()).extracting(ReportPeriodResponse::getCount).containsExactly(1L, 2L);
++	}
++
++	@Test
++	public void totalsCoverEveryPeriod() {
++
++		givenExpenses(expense("2023-01-10T10:00:00Z", 100.5), expense("2023-03-10T10:00:00Z", 20.0), expense("2023-03-11T10:00:00Z", 0.25));
++
++		ReportResponse report = reportService.report(request(ReportPeriod.MONTH), USER_ID);
++
++		Assertions.assertThat(report.getTotalAmount()).isEqualTo(120.75);
++		Assertions.assertThat(report.getCount()).isEqualTo(3L);
++	}
++
++	@Test
++	public void monthsWithoutExpensesBetweenTheFirstAndTheLastAreListedWithZero() {
++
++		givenExpenses(expense("2023-03-10T10:00:00Z", 20.0), expense("2023-01-10T10:00:00Z", 100.0));
++
++		ReportResponse report = reportService.report(request(ReportPeriod.MONTH), USER_ID);
++
++		Assertions.assertThat(report.getPeriods()).extracting(ReportPeriodResponse::getPeriod).containsExactly("2023-01", "2023-02", "2023-03");
++		Assertions.assertThat(report.getPeriods().get(1).getTotalAmount()).isEqualTo(0.0);
++		Assertions.assertThat(report.getPeriods().get(1).getCount()).isEqualTo(0L);
++	}
++
++	@Test
++	public void yearsWithoutExpensesAreListedWithZero() {
++
++		givenExpenses(expense("2021-05-10T10:00:00Z", 1.0), expense("2023-05-10T10:00:00Z", 2.0));
++
++		ReportResponse report = reportService.report(request(ReportPeriod.YEAR), USER_ID);
++
++		Assertions.assertThat(report.getPeriods()).extracting(ReportPeriodResponse::getPeriod).containsExactly("2021", "2022", "2023");
++	}
++
++	@Test
++	public void deletedExpensesAreLeftOut() {
++
++		Expense deleted = expense("2023-01-10T10:00:00Z", 1000.0);
++		deleted.setEnable(null);
++		givenExpenses(expense("2023-01-11T10:00:00Z", 5.0), deleted);
++
++		ReportResponse report = reportService.report(request(ReportPeriod.MONTH), USER_ID);
++
++		Assertions.assertThat(report.getTotalAmount()).isEqualTo(5.0);
++		Assertions.assertThat(report.getCount()).isEqualTo(1L);
++	}
++
++	@Test
++	public void expensesWithoutDateBelongToNoPeriodAndWithoutAmountAddNothing() {
++
++		Expense undated = Expense.builder().name("undated").amount(50.0).build();
++		Expense withoutAmount = expense("2023-01-10T10:00:00Z", null);
++		givenExpenses(undated, withoutAmount, expense("2023-01-11T10:00:00Z", 7.0));
++
++		ReportResponse report = reportService.report(request(ReportPeriod.MONTH), USER_ID);
++
++		Assertions.assertThat(report.getPeriods()).hasSize(1);
++		Assertions.assertThat(report.getPeriods().get(0).getTotalAmount()).isEqualTo(7.0);
++		Assertions.assertThat(report.getPeriods().get(0).getCount()).isEqualTo(2L);
++	}
++
++	@Test
++	public void amountsAreAddedWithoutFloatingPointNoise() {
++
++		givenExpenses(expense("2023-01-10T10:00:00Z", 0.1), expense("2023-01-11T10:00:00Z", 0.2));
++
++		ReportResponse report = reportService.report(request(ReportPeriod.MONTH), USER_ID);
++
++		Assertions.assertThat(report.getTotalAmount()).isEqualTo(0.3);
++		Assertions.assertThat(report.getPeriods().get(0).getTotalAmount()).isEqualTo(0.3);
++	}
++
++	@Test
++	public void noExpensesGiveAnEmptyReport() {
++
++		givenExpenses();
++
++		ReportResponse report = reportService.report(request(ReportPeriod.MONTH), USER_ID);
++
++		Assertions.assertThat(report.getPeriods()).isEmpty();
++		Assertions.assertThat(report.getTotalAmount()).isEqualTo(0.0);
++		Assertions.assertThat(report.getCount()).isEqualTo(0L);
++	}
++
++	@Test
++	public void filtersAreHandedToTheExpenseSearchForTheCallerOnly() {
++
++		givenExpenses();
++		Date from = Date.from(Instant.parse("2023-01-01T00:00:00Z"));
++		Date to = Date.from(Instant.parse("2023-12-31T00:00:00Z"));
++		ReportRequest request = ReportRequest.builder().period(ReportPeriod.YEAR).name("lunch").tag("#daily").categoryId(7L).fromDate(from).toDate(to).build();
++
++		reportService.report(request, USER_ID);
++
++		ArgumentCaptor<ExpenseListRequest> search = ArgumentCaptor.forClass(ExpenseListRequest.class);
++		Mockito.verify(expenseRepository).searchExpenses(search.capture());
++		Assertions.assertThat(search.getValue().getUserId()).isEqualTo(USER_ID);
++		Assertions.assertThat(search.getValue().getName()).isEqualTo("lunch");
++		Assertions.assertThat(search.getValue().getTag()).isEqualTo("#daily");
++		Assertions.assertThat(search.getValue().getCategoryId()).isEqualTo(7L);
++		Assertions.assertThat(search.getValue().getFromDate()).isEqualTo(from);
++		Assertions.assertThat(search.getValue().getToDate()).isEqualTo(to);
++	}
++
++	@Test
++	public void unknownCallerGetsAnEmptyReportWithoutTouchingTheDatabase() {
++
++		ReportResponse report = reportService.report(request(ReportPeriod.MONTH), null);
++
++		Assertions.assertThat(report.getPeriods()).isEmpty();
++		Mockito.verifyNoInteractions(expenseRepository);
++	}
++
++	private void givenExpenses(Expense... expenses) {
++
++		Mockito.when(expenseRepository.searchExpenses(Mockito.any())).thenReturn(List.of(expenses));
++	}
++
++	private ReportRequest request(ReportPeriod period) {
++
++		return ReportRequest.builder().period(period).build();
++	}
++
++	private Expense expense(String instant, Double amount) {
++
++		return Expense.builder().name("expense").amount(amount).expenseDate(Date.from(Instant.parse(instant))).build();
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/service/TriggerServiceTest.java b/src/test/java/ir/expense/tracker/makharej/service/TriggerServiceTest.java
+new file mode 100644
+index 0000000..206bfc3
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/service/TriggerServiceTest.java
+@@ -0,0 +1,258 @@
++package ir.expense.tracker.makharej.service;
++
++
++import ir.expense.tracker.makharej.common.exception.CategoryNotFoundException;
++import ir.expense.tracker.makharej.common.exception.TriggerNotFoundException;
++import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
++import ir.expense.tracker.makharej.dto.report.ReportPeriod;
++import ir.expense.tracker.makharej.dto.report.ReportRequest;
++import ir.expense.tracker.makharej.dto.report.ReportResponse;
++import ir.expense.tracker.makharej.dto.trigger.TriggerListRequest;
++import ir.expense.tracker.makharej.dto.trigger.TriggerRequest;
++import ir.expense.tracker.makharej.dto.trigger.TriggerResponse;
++import ir.expense.tracker.makharej.dto.trigger.TriggerUpdateRequest;
++import ir.expense.tracker.makharej.entity.Category;
++import ir.expense.tracker.makharej.entity.ExpenseTrigger;
++import ir.expense.tracker.makharej.entity.User;
++import ir.expense.tracker.makharej.repository.ExpenseTriggerRepository;
++import org.assertj.core.api.Assertions;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.Mock;
++import org.mockito.Mockito;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.time.Clock;
++import java.time.Instant;
++import java.time.ZoneOffset;
++import java.util.Date;
++import java.util.List;
++
++
++@ExtendWith(MockitoExtension.class)
++public class TriggerServiceTest {
++
++	private static final Long USER_ID = 333L;
++	private static final Long OTHER_USER_ID = 444L;
++
++	@Mock
++	private ExpenseTriggerRepository triggerRepository;
++	@Mock
++	private CategoryService categoryService;
++	@Mock
++	private UserService userService;
++	@Mock
++	private ReportService reportService;
++
++	private User user;
++
++	@BeforeEach
++	public void setup()
++	{
++		user = User.builder().username("testUsername").name("testName").build();
++		user.setId(USER_ID);
++	}
++
++	@Test
++	public void triggerIsSavedForTheCaller() throws Exception {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		Category category = Category.builder().name("coffee").user(user).build();
++		category.setId(7L);
++		Mockito.when(categoryService.findCategoryById(7L, USER_ID)).thenReturn(category);
++		Mockito.when(userService.findUserById(USER_ID)).thenReturn(user);
++		givenTotal(0.0);
++		TriggerRequest request = TriggerRequest.builder().name("coffee budget").period(ReportPeriod.MONTH).limit(50.0).tag("coffee").expenseName("latte").categoryId(7L).build();
++
++		TriggerResponse response = service.createTrigger(request, USER_ID);
++
++		ArgumentCaptor<ExpenseTrigger> saved = ArgumentCaptor.forClass(ExpenseTrigger.class);
++		Mockito.verify(triggerRepository).save(saved.capture());
++		Assertions.assertThat(saved.getValue().getUser()).isSameAs(user);
++		Assertions.assertThat(saved.getValue().getCategory()).isSameAs(category);
++		Assertions.assertThat(saved.getValue().getLimit()).isEqualTo(50.0);
++		Assertions.assertThat(saved.getValue().getPeriod()).isEqualTo(ReportPeriod.MONTH);
++		Assertions.assertThat(saved.getValue().getTag()).isEqualTo("coffee");
++		Assertions.assertThat(saved.getValue().getExpenseName()).isEqualTo("latte");
++		Assertions.assertThat(response.getName()).isEqualTo("coffee budget");
++		Assertions.assertThat(response.getCategoryId()).isEqualTo(7L);
++	}
++
++	@Test
++	public void triggerCannotUseACategoryOfAnotherUser() throws Exception {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		Mockito.when(categoryService.findCategoryById(7L, USER_ID)).thenThrow(new CategoryNotFoundException());
++		TriggerRequest request = TriggerRequest.builder().name("coffee budget").period(ReportPeriod.MONTH).limit(50.0).categoryId(7L).build();
++
++		Assertions.assertThatThrownBy(() -> service.createTrigger(request, USER_ID)).isInstanceOf(CategoryNotFoundException.class);
++
++		Mockito.verify(triggerRepository, Mockito.never()).save(Mockito.any());
++	}
++
++	@Test
++	public void unknownCallerCannotCreateOrListTriggers() {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		TriggerRequest request = TriggerRequest.builder().name("coffee budget").period(ReportPeriod.MONTH).limit(50.0).build();
++
++		Assertions.assertThatThrownBy(() -> service.createTrigger(request, null)).isInstanceOf(UserNotFoundException.class);
++		Assertions.assertThat(service.find(new TriggerListRequest(), null)).isEmpty();
++
++		Mockito.verifyNoInteractions(triggerRepository);
++	}
++
++	@Test
++	public void monthlyTriggerLooksAtTheCurrentTehranMonth() throws Exception {
++
++		// 2023-05-15 in Tehran (UTC+03:30): May starts at 2023-04-30T20:30:00Z and ends at 2023-05-31T20:29:59.999Z
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		Mockito.when(triggerRepository.findActiveByIdAndUserId(1L, USER_ID)).thenReturn(trigger(1L, ReportPeriod.MONTH, 50.0, "coffee"));
++		givenTotal(12.0);
++
++		TriggerResponse response = service.findById(1L, USER_ID);
++
++		ReportRequest asked = askedReport();
++		Assertions.assertThat(asked.getPeriod()).isEqualTo(ReportPeriod.MONTH);
++		Assertions.assertThat(asked.getFromDate()).isEqualTo(Date.from(Instant.parse("2023-04-30T20:30:00Z")));
++		Assertions.assertThat(asked.getToDate()).isEqualTo(Date.from(Instant.parse("2023-05-31T20:29:59.999Z")));
++		Assertions.assertThat(asked.getTag()).isEqualTo("coffee");
++		Assertions.assertThat(response.getCurrentPeriod()).isEqualTo("2023-05");
++		Assertions.assertThat(response.getCurrentAmount()).isEqualTo(12.0);
++	}
++
++	@Test
++	public void yearlyTriggerLooksAtTheCurrentTehranYear() throws Exception {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		Mockito.when(triggerRepository.findActiveByIdAndUserId(1L, USER_ID)).thenReturn(trigger(1L, ReportPeriod.YEAR, 500.0, null));
++		givenTotal(0.0);
++
++		TriggerResponse response = service.findById(1L, USER_ID);
++
++		ReportRequest asked = askedReport();
++		Assertions.assertThat(asked.getFromDate()).isEqualTo(Date.from(Instant.parse("2022-12-31T20:30:00Z")));
++		Assertions.assertThat(asked.getToDate()).isEqualTo(Date.from(Instant.parse("2023-12-31T20:29:59.999Z")));
++		Assertions.assertThat(response.getCurrentPeriod()).isEqualTo("2023");
++	}
++
++	@Test
++	public void theMonthChangesAtMidnightInTehranNotInUtc() throws Exception {
++
++		// 21:00Z on the 31st of January is 00:30 on the 1st of February in Tehran
++		TriggerService service = serviceAt("2023-01-31T21:00:00Z");
++		Mockito.when(triggerRepository.findActiveByIdAndUserId(1L, USER_ID)).thenReturn(trigger(1L, ReportPeriod.MONTH, 50.0, null));
++		givenTotal(0.0);
++
++		Assertions.assertThat(service.findById(1L, USER_ID).getCurrentPeriod()).isEqualTo("2023-02");
++	}
++
++	@Test
++	public void alarmGoesOffOnlyAboveTheLimit() throws Exception {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		Mockito.when(triggerRepository.findActiveByIdAndUserId(1L, USER_ID)).thenReturn(trigger(1L, ReportPeriod.MONTH, 50.0, null));
++
++		givenTotal(49.99);
++		Assertions.assertThat(service.findById(1L, USER_ID).getTriggered()).isFalse();
++		givenTotal(50.0);
++		Assertions.assertThat(service.findById(1L, USER_ID).getTriggered()).isFalse();
++		givenTotal(50.01);
++		Assertions.assertThat(service.findById(1L, USER_ID).getTriggered()).isTrue();
++	}
++
++	@Test
++	public void triggerOfAnotherUserIsNotFound() {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		Mockito.when(triggerRepository.findActiveByIdAndUserId(1L, OTHER_USER_ID)).thenReturn(null);
++		TriggerUpdateRequest update = TriggerUpdateRequest.builder().id(1L).name("x").period(ReportPeriod.YEAR).limit(1.0).build();
++
++		Assertions.assertThatThrownBy(() -> service.findById(1L, OTHER_USER_ID)).isInstanceOf(TriggerNotFoundException.class);
++		Assertions.assertThatThrownBy(() -> service.updateTrigger(update, OTHER_USER_ID)).isInstanceOf(TriggerNotFoundException.class);
++		Assertions.assertThatThrownBy(() -> service.deleteTrigger(1L, OTHER_USER_ID)).isInstanceOf(TriggerNotFoundException.class);
++		Assertions.assertThatThrownBy(() -> service.findById(1L, null)).isInstanceOf(TriggerNotFoundException.class);
++
++		Mockito.verify(triggerRepository, Mockito.never()).save(Mockito.any());
++		Mockito.verify(triggerRepository, Mockito.never()).findById(Mockito.any());
++	}
++
++	@Test
++	public void updateReplacesTheRule() throws Exception {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		ExpenseTrigger trigger = trigger(1L, ReportPeriod.MONTH, 50.0, "coffee");
++		Mockito.when(triggerRepository.findActiveByIdAndUserId(1L, USER_ID)).thenReturn(trigger);
++		givenTotal(30.0);
++		TriggerUpdateRequest update = TriggerUpdateRequest.builder().id(1L).name("renamed").period(ReportPeriod.YEAR).limit(20.0).build();
++
++		TriggerResponse response = service.updateTrigger(update, USER_ID);
++
++		Assertions.assertThat(trigger.getName()).isEqualTo("renamed");
++		Assertions.assertThat(trigger.getPeriod()).isEqualTo(ReportPeriod.YEAR);
++		Assertions.assertThat(trigger.getLimit()).isEqualTo(20.0);
++		Assertions.assertThat(trigger.getTag()).isNull();
++		Assertions.assertThat(trigger.getCategory()).isNull();
++		Assertions.assertThat(response.getTriggered()).isTrue();
++		Mockito.verify(triggerRepository).save(trigger);
++	}
++
++	@Test
++	public void deleteSwitchesTheTriggerOff() throws Exception {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		ExpenseTrigger trigger = trigger(1L, ReportPeriod.MONTH, 50.0, null);
++		Mockito.when(triggerRepository.findActiveByIdAndUserId(1L, USER_ID)).thenReturn(trigger);
++		givenTotal(0.0);
++
++		service.deleteTrigger(1L, USER_ID);
++
++		Assertions.assertThat(trigger.getEnable()).isNull();
++		Mockito.verify(triggerRepository).save(trigger);
++	}
++
++	@Test
++	public void listCanBeNarrowedByNameAndByAlarmState() {
++
++		TriggerService service = serviceAt("2023-05-15T10:00:00Z");
++		Mockito.when(triggerRepository.findActiveByUserId(USER_ID)).thenReturn(List.of(
++				trigger(1L, ReportPeriod.MONTH, 50.0, "coffee"),
++				trigger(2L, ReportPeriod.MONTH, 50.0, "taxi")));
++		Mockito.when(reportService.report(Mockito.any(), Mockito.eq(USER_ID))).thenAnswer(invocation -> {
++			ReportRequest asked = invocation.getArgument(0);
++			return ReportResponse.builder().totalAmount("coffee".equals(asked.getTag()) ? 80.0 : 10.0).build();
++		});
++
++		Assertions.assertThat(service.find(new TriggerListRequest(), USER_ID)).extracting(TriggerResponse::getId).containsExactly(1L, 2L);
++		Assertions.assertThat(service.find(TriggerListRequest.builder().triggered(true).build(), USER_ID)).extracting(TriggerResponse::getId).containsExactly(1L);
++		Assertions.assertThat(service.find(TriggerListRequest.builder().triggered(false).build(), USER_ID)).extracting(TriggerResponse::getId).containsExactly(2L);
++		Assertions.assertThat(service.find(TriggerListRequest.builder().name("trigger-2").build(), USER_ID)).extracting(TriggerResponse::getId).containsExactly(2L);
++	}
++
++	private TriggerService serviceAt(String instant) {
++
++		Clock clock = Clock.fixed(Instant.parse(instant), ZoneOffset.UTC);
++		return new TriggerService(triggerRepository, categoryService, userService, reportService, clock);
++	}
++
++	private void givenTotal(double total) {
++
++		Mockito.when(reportService.report(Mockito.any(), Mockito.any())).thenReturn(ReportResponse.builder().totalAmount(total).count(1L).build());
++	}
++
++	private ReportRequest askedReport() {
++
++		ArgumentCaptor<ReportRequest> asked = ArgumentCaptor.forClass(ReportRequest.class);
++		Mockito.verify(reportService).report(asked.capture(), Mockito.eq(USER_ID));
++		return asked.getValue();
++	}
++
++	private ExpenseTrigger trigger(Long id, ReportPeriod period, double limit, String tag) {
++
++		ExpenseTrigger trigger = ExpenseTrigger.builder().name("trigger-" + id).period(period).limit(limit).tag(tag).user(user).build();
++		trigger.setId(id);
++		return trigger;
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/service/UserDetailServiceImplTest.java b/src/test/java/ir/expense/tracker/makharej/service/UserDetailServiceImplTest.java
+new file mode 100644
+index 0000000..b8d956d
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/service/UserDetailServiceImplTest.java
+@@ -0,0 +1,69 @@
++package ir.expense.tracker.makharej.service;
++
++
++import ir.expense.tracker.makharej.entity.User;
++import ir.expense.tracker.makharej.repository.UserRepository;
++import ir.expense.tracker.makharej.security.AppUserDetails;
++import org.assertj.core.api.Assertions;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.Mock;
++import org.mockito.Mockito;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.security.core.userdetails.UserDetails;
++import org.springframework.security.core.userdetails.UsernameNotFoundException;
++
++
++@ExtendWith(MockitoExtension.class)
++public class UserDetailServiceImplTest {
++
++	@Mock
++	private UserRepository userRepository;
++	private UserDetailServiceImpl userDetailService;
++	private User user;
++
++	@BeforeEach
++	public void setup()
++	{
++		userDetailService = new UserDetailServiceImpl(userRepository);
++		user = User.builder().username("testUsername").name("testName").password("encoded").build();
++		user.setId(333L);
++	}
++
++	@Test
++	public void activeUserIsLoadedWithHisId() {
++
++		Mockito.when(userRepository.findByUsername("testUsername")).thenReturn(user);
++
++		UserDetails userDetails = userDetailService.loadUserByUsername("testUsername");
++
++		Assertions.assertThat(userDetails).isInstanceOf(AppUserDetails.class);
++		Assertions.assertThat(((AppUserDetails) userDetails).getId()).isEqualTo(333L);
++		Assertions.assertThat(userDetails.getUsername()).isEqualTo("testUsername");
++	}
++
++	@Test
++	public void deletedUserIsUnknown() {
++
++		user.setEnable(null);
++		Mockito.when(userRepository.findByUsername("testUsername")).thenReturn(user);
++
++		Assertions.assertThatThrownBy(() -> userDetailService.loadUserByUsername("testUsername")).isInstanceOf(UsernameNotFoundException.class);
++	}
++
++	@Test
++	public void disabledUserIsUnknown() {
++
++		user.setEnable(Boolean.FALSE);
++		Mockito.when(userRepository.findByUsername("testUsername")).thenReturn(user);
++
++		Assertions.assertThatThrownBy(() -> userDetailService.loadUserByUsername("testUsername")).isInstanceOf(UsernameNotFoundException.class);
++	}
++
++	@Test
++	public void missingUserIsUnknown() {
++
++		Assertions.assertThatThrownBy(() -> userDetailService.loadUserByUsername("nobody")).isInstanceOf(UsernameNotFoundException.class);
++	}
++}
+diff --git a/src/test/java/ir/expense/tracker/makharej/service/UserServiceTest.java b/src/test/java/ir/expense/tracker/makharej/service/UserServiceTest.java
+new file mode 100644
+index 0000000..b906dd2
+--- /dev/null
++++ b/src/test/java/ir/expense/tracker/makharej/service/UserServiceTest.java
+@@ -0,0 +1,116 @@
++package ir.expense.tracker.makharej.service;
++
++
++import ir.expense.tracker.makharej.common.exception.UserNotFoundException;
++import ir.expense.tracker.makharej.common.messages.ErrorMessages;
++import ir.expense.tracker.makharej.dto.user.UserRequest;
++import ir.expense.tracker.makharej.dto.user.UserResponse;
++import ir.expense.tracker.makharej.entity.User;
++import ir.expense.tracker.makharej.repository.UserRepository;
++import org.assertj.core.api.Assertions;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.Mock;
++import org.mockito.Mockito;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.dao.DataIntegrityViolationException;
++import org.springframework.security.crypto.password.PasswordEncoder;
++
++import java.util.Optional;
++
++
++@ExtendWith(MockitoExtension.class)
++public class UserServiceTest {
++
++	@Mock
++	private UserRepository userRepository;
++	@Mock
++	private PasswordEncoder encoder;
++	private UserService userService;
++
++	private final Long userId = 333L;
++	private final Long anotherUserId = 444L;
++	private User user;
++
++	@BeforeEach
++	public void setup()
++	{
++		userService = new UserService(userRepository, encoder);
++		user = User.builder().username("testUsername").name("testName").build();
++		user.setId(userId);
++	}
++
++	@Test
++	public void userCanFindHimself() throws UserNotFoundException {
++
++		Mockito.when(userRepository.findById(userId)).thenReturn(Optional.of(user));
++
++		UserResponse response = userService.findById(userId, userId);
++
++		Assertions.assertThat(response.getId()).isEqualTo(userId);
++		Assertions.assertThat(response.getUsername()).isEqualTo("testUsername");
++	}
++
++	@Test
++	public void userCanDeleteHimself() throws UserNotFoundException {
++
++		Mockito.when(userRepository.findById(userId)).thenReturn(Optional.of(user));
++
++		userService.deleteUser(userId, userId);
++
++		Assertions.assertThat(user.getEnable()).isNull();
++		Mockito.verify(userRepository).save(user);
++	}
++
++	@Test
++	public void userCannotFindAnotherUser() {
++
++		Assertions.assertThatThrownBy(() -> userService.findById(userId, anotherUserId))
++				  .isInstanceOf(UserNotFoundException.class).hasMessage(ErrorMessages.USER_NOT_FOUND);
++
++		Mockito.verifyNoInteractions(userRepository);
++	}
++
++	@Test
++	public void userCannotDeleteAnotherUser() {
++
++		Assertions.assertThatThrownBy(() -> userService.deleteUser(userId, anotherUserId))
++				  .isInstanceOf(UserNotFoundException.class).hasMessage(ErrorMessages.USER_NOT_FOUND);
++
++		Mockito.verifyNoInteractions(userRepository);
++	}
++
++	@Test
++	public void unknownCallerCannotFindOrDeleteAnybody() {
++
++		Assertions.assertThatThrownBy(() -> userService.findById(userId, null)).isInstanceOf(UserNotFoundException.class);
++		Assertions.assertThatThrownBy(() -> userService.deleteUser(userId, null)).isInstanceOf(UserNotFoundException.class);
++
++		Mockito.verifyNoInteractions(userRepository);
++	}
++
++	@Test
++	public void usernameOfExistingOrDeletedUserCannotBeRegistered() {
++
++		Mockito.when(userRepository.existsByUsername("testUsername")).thenReturn(true);
++		UserRequest request = UserRequest.builder().username("testUsername").name("newName").password("secret").build();
++
++		Assertions.assertThatThrownBy(() -> userService.createUser(request)).isInstanceOf(DataIntegrityViolationException.class);
++
++		Mockito.verify(userRepository, Mockito.never()).save(Mockito.any());
++	}
++
++	@Test
++	public void newUsernameCanBeRegistered() {
++
++		Mockito.when(userRepository.existsByUsername("freshName")).thenReturn(false);
++		Mockito.when(encoder.encode("secret")).thenReturn("encoded");
++		UserRequest request = UserRequest.builder().username("freshName").name("newName").password("secret").build();
++
++		UserResponse response = userService.createUser(request);
++
++		Assertions.assertThat(response.getUsername()).isEqualTo("freshName");
++		Mockito.verify(userRepository).save(Mockito.any());
++	}
++}

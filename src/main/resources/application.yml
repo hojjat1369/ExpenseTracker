@@ -9,6 +9,13 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        id:
+          # Hibernate 6 defaults to one "<entity>_seq" sequence per entity (allocating blocks of 50).
+          # Keep the Hibernate 5 behaviour (a single shared "hibernate_sequence", increment 1) so that
+          # existing databases keep working and ids keep being allocated the same way.
+          db_structure_naming_strategy: legacy
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher

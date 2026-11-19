@@ -17,4 +17,8 @@ public class ErrorMessages {
 	public static final String INTERNAL_ERROR = "internal error!";
 	public static final String USER_ID_CANNOT_BE_NULL = "user id cannot be null!";
 	public static final String INVALID_TOKEN = "invalid token!";
+	public static final String PERIOD_CANNOT_BE_NULL = "period cannot be null!";
+	public static final String TRIGGER_NOT_FOUND_EXCEPTION = "trigger not found!";
+	public static final String LIMIT_CANNOT_BE_NULL = "limit cannot be null!";
+	public static final String LIMIT_MUST_BE_POSITIVE = "limit must be greater than zero!";
 }

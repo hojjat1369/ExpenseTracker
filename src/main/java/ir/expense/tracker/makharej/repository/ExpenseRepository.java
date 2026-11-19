@@ -17,4 +17,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, Expense
 	@Query("Select e from Expense e where e.name like :name")
 	public List<Expense> findByNameContaining(@Param("name") String name);
 
+	@Query("Select e from Expense e where e.id=:id and e.user.id=:userId")
+	public Expense findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
 }

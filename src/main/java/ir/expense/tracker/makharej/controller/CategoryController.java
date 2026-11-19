@@ -13,10 +13,11 @@ import ir.expense.tracker.makharej.entity.Category;
 import ir.expense.tracker.makharej.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 
 
@@ -39,16 +40,16 @@ public class CategoryController {
 	@PatchMapping
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
-	public CategoryResponse updateCategory(@Valid @RequestBody CategoryUpdateRequest categoryUpdateRequest) throws CategoryNotFoundException {
-		return categoryService.updateCategory(categoryUpdateRequest);
+	public CategoryResponse updateCategory(@Valid @RequestBody CategoryUpdateRequest categoryUpdateRequest, @AuthenticationPrincipal(expression = "id") Long userId) throws CategoryNotFoundException {
+		return categoryService.updateCategory(categoryUpdateRequest, userId);
 	}
 
 	@GetMapping
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
-	public CategoryResponse findCategoryById(@Valid @RequestParam Long id) throws CategoryNotFoundException {
+	public CategoryResponse findCategoryById(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws CategoryNotFoundException {
 
-		return categoryService.findById(id);
+		return categoryService.findById(id, userId);
 	}
 
 	@PostMapping(path = "/find")
@@ -63,8 +64,8 @@ public class CategoryController {
 	@DeleteMapping
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
-	public CategoryResponse delete(@Valid @RequestParam Long id) throws CategoryNotFoundException {
+	public CategoryResponse delete(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws CategoryNotFoundException {
 
-		return categoryService.deleteCategory(id);
+		return categoryService.deleteCategory(id, userId);
 	}
 }

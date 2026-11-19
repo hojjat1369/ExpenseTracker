@@ -1,7 +1,7 @@
 package ir.expense.tracker.makharej.dto.user;
 
 
-import io.swagger.annotations.ApiModelProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
 
@@ -9,6 +9,6 @@ import lombok.*;
 @Setter
 public class Userable {
 
-	@ApiModelProperty(required = false, hidden = true)
+	@Schema(hidden = true)
 	private Long userId;
 }

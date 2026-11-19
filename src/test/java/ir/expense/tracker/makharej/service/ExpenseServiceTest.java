@@ -26,7 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Calendar;
 import java.util.Date;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -89,11 +88,11 @@ public class ExpenseServiceTest {
 		category.setId(categoryId);
 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
 
-		Mockito.when(categoryService.findCategoryById(categoryId)).thenReturn(category);
+		Mockito.when(categoryService.findCategoryById(categoryId, userId)).thenReturn(category);
 		Mockito.when(expenseRepository.save(Mockito.any())).thenReturn(expense);
-		Mockito.when(expenseRepository.findById(expenseId)).thenReturn(Optional.ofNullable(expense));
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
 
-		ExpenseResponse expenseResponse = expenseService.updateExpense(request);
+		ExpenseResponse expenseResponse = expenseService.updateExpense(request, userId);
 
 		Assertions.assertThat(name).isEqualTo(expenseResponse.getName());
 		Assertions.assertThat(note).isEqualTo(expenseResponse.getNote());
@@ -111,10 +110,10 @@ public class ExpenseServiceTest {
 		category.setId(categoryId);
 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
 
-		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(null);
 
 		Assertions.assertThatThrownBy(() -> {
-			expenseService.updateExpense(request);
+			expenseService.updateExpense(request, userId);
 		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
 	}
 
@@ -126,9 +125,9 @@ public class ExpenseServiceTest {
 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
 
 		Mockito.when(expenseRepository.save(Mockito.any())).thenReturn(expense);
-		Mockito.when(expenseRepository.findById(expenseId)).thenReturn(Optional.ofNullable(expense));
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
 
-		ExpenseResponse expenseResponse = expenseService.deleteExpense(123L);
+		ExpenseResponse expenseResponse = expenseService.deleteExpense(123L, userId);
 
 		Assertions.assertThat(name).isEqualTo(expenseResponse.getName());
 		Assertions.assertThat(note).isEqualTo(expenseResponse.getNote());
@@ -141,10 +140,10 @@ public class ExpenseServiceTest {
 	@Test
 	public void deleteExpenseIdNotFound() throws ExpenseNotFoundException {
 
-		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(null);
 
 		Assertions.assertThatThrownBy(() -> {
-			expenseService.deleteExpense(123L);
+			expenseService.deleteExpense(123L, userId);
 		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
 	}
 
@@ -155,9 +154,9 @@ public class ExpenseServiceTest {
 		category.setId(categoryId);
 		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
 
-		Mockito.when(expenseRepository.findById(expenseId)).thenReturn(Optional.ofNullable(expense));
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
 
-		ExpenseResponse expenseResponse = expenseService.findById(123L);
+		ExpenseResponse expenseResponse = expenseService.findById(123L, userId);
 
 		Assertions.assertThat(name).isEqualTo(expenseResponse.getName());
 		Assertions.assertThat(note).isEqualTo(expenseResponse.getNote());
@@ -171,10 +170,66 @@ public class ExpenseServiceTest {
 	@Test
 	public void findByIdNotFound() throws ExpenseNotFoundException {
 
-		Mockito.when(expenseRepository.findById(categoryId)).thenReturn(Optional.ofNullable(null));
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(null);
 
 		Assertions.assertThatThrownBy(() -> {
-			expenseService.findById(123L);
+			expenseService.findById(123L, userId);
 		}).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
+	}
+
+	@Test
+	public void expenseOfAnotherUserIsNotFound() {
+
+		Long anotherUserId = 444L;
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, anotherUserId)).thenReturn(null);
+		ExpenseUpdateRequest request = ExpenseUpdateRequest.builder().id(expenseId).name("hijacked").amount(1.0).build();
+
+		Assertions.assertThatThrownBy(() -> expenseService.findById(expenseId, anotherUserId)).isInstanceOf(ExpenseNotFoundException.class).hasMessage(ErrorMessages.Expense_NOT_FOUND_EXCEPTION);
+		Assertions.assertThatThrownBy(() -> expenseService.updateExpense(request, anotherUserId)).isInstanceOf(ExpenseNotFoundException.class);
+		Assertions.assertThatThrownBy(() -> expenseService.deleteExpense(expenseId, anotherUserId)).isInstanceOf(ExpenseNotFoundException.class);
+
+		Mockito.verify(expenseRepository, Mockito.times(3)).findByIdAndUserId(expenseId, anotherUserId);
+		Mockito.verify(expenseRepository, Mockito.never()).findById(Mockito.any());
+		Mockito.verify(expenseRepository, Mockito.never()).save(Mockito.any());
+	}
+
+	@Test
+	public void expenseCannotBeMovedIntoACategoryOfAnotherUser() throws CategoryNotFoundException {
+
+		Category category = Category.builder().name("sampleCategoryName").build();
+		category.setId(categoryId);
+		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
+		ExpenseUpdateRequest request = ExpenseUpdateRequest.builder().id(expenseId).categoryId(999L).build();
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
+		Mockito.when(categoryService.findCategoryById(999L, userId)).thenThrow(new CategoryNotFoundException());
+
+		Assertions.assertThatThrownBy(() -> expenseService.updateExpense(request, userId)).isInstanceOf(CategoryNotFoundException.class);
+
+		Mockito.verify(expenseRepository, Mockito.never()).save(Mockito.any());
+		Assertions.assertThat(expense.getCategory()).isSameAs(category);
+	}
+
+	@Test
+	public void unknownCallerCanNotFindAnyExpense() {
+
+		Assertions.assertThatThrownBy(() -> expenseService.findExpenseById(expenseId, null)).isInstanceOf(ExpenseNotFoundException.class);
+
+		Mockito.verifyNoInteractions(expenseRepository);
+	}
+
+	@Test
+	public void updateWithoutADateKeepsTheDate() throws CategoryNotFoundException, ExpenseNotFoundException {
+
+		Category category = Category.builder().name("sampleCategoryName").build();
+		category.setId(categoryId);
+		Expense expense = Expense.builder().name(name).expenseDate(expenseDate).amount(amount).tag(tag).note(note).category(category).build();
+		ExpenseUpdateRequest request = ExpenseUpdateRequest.builder().id(expenseId).amount(7.5).build();
+		Mockito.when(expenseRepository.findByIdAndUserId(expenseId, userId)).thenReturn(expense);
+
+		ExpenseResponse response = expenseService.updateExpense(request, userId);
+
+		Assertions.assertThat(response.getExpenseDate()).isEqualTo(expenseDate);
+		Assertions.assertThat(expense.getExpenseDate()).isEqualTo(expenseDate);
+		Assertions.assertThat(response.getAmount()).isEqualTo(7.5);
 	}
 }

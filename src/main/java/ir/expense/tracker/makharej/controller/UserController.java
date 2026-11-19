@@ -15,11 +15,11 @@ import ir.expense.tracker.makharej.service.CategoryService;
 import ir.expense.tracker.makharej.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import javax.validation.Valid;
-import java.util.List;
+import jakarta.validation.Valid;
 
 
 @Controller
@@ -31,22 +31,17 @@ public class UserController {
 
 	@GetMapping
 	@ResponseStatus(HttpStatus.OK)
-	public UserResponse findUserById(@Valid @RequestParam Long id) throws UserNotFoundException {
+	@ResponseBody
+	public UserResponse findUserById(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws UserNotFoundException {
 
-		return userService.findById(id);
-	}
-
-	@GetMapping(path = "/find/all")
-	@ResponseStatus(HttpStatus.OK)
-	public List<UserResponse> findAllUsers() {
-
-		return userService.findAllUsers();
+		return userService.findById(id, userId);
 	}
 
 	@DeleteMapping
 	@ResponseStatus(HttpStatus.OK)
-	public UserResponse delete(@Valid @RequestParam Long id) throws UserNotFoundException {
+	@ResponseBody
+	public UserResponse delete(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws UserNotFoundException {
 
-		return userService.deleteUser(id);
+		return userService.deleteUser(id, userId);
 	}
 }

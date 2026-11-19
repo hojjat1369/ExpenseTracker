@@ -4,6 +4,7 @@ package ir.expense.tracker.makharej.service;
 import ir.expense.tracker.makharej.common.messages.ErrorMessages;
 import ir.expense.tracker.makharej.entity.User;
 import ir.expense.tracker.makharej.repository.UserRepository;
+import ir.expense.tracker.makharej.security.AppUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -25,11 +26,11 @@ public class UserDetailServiceImpl implements UserDetailsService {
 	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
 		User user = userRepository.findByUsername(username);
-		if(user == null)
+		if(user == null || !Boolean.TRUE.equals(user.getEnable()))
 		{
 			log.error("user {} not found!", username);
 			throw new UsernameNotFoundException(ErrorMessages.USER_NOT_FOUND);
 		}
-		return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), new ArrayList<>());
+		return new AppUserDetails(user.getId(), user.getUsername(), user.getPassword(), new ArrayList<>());
 	}
 }

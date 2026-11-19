@@ -1,14 +1,15 @@
 package ir.expense.tracker.makharej.dto.expense;
 
 
-import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import ir.expense.tracker.makharej.common.util.TehranDateTimeDeserializer;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.util.Date;
 
 
@@ -23,7 +24,7 @@ public class ExpenseUpdateRequest {
 	private Double amount;
 	private String tag;
 	private String note;
-	@JsonFormat(pattern = "yyyy-mm-dd HH:mm")
+	@JsonDeserialize(using = TehranDateTimeDeserializer.class)
 	private Date expenseDate;
 	private Long categoryId;
 }

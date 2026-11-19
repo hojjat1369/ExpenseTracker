@@ -15,9 +15,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import javax.transaction.Transactional;
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
+import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,9 +45,9 @@ public class CategoryService {
 		return toCategoryResponse(category);
 	}
 
-	public CategoryResponse updateCategory(@Valid @NotNull CategoryUpdateRequest categoryUpdateRequest) throws CategoryNotFoundException {
+	public CategoryResponse updateCategory(@Valid @NotNull CategoryUpdateRequest categoryUpdateRequest, Long userId) throws CategoryNotFoundException {
 
-		Category category = findCategoryById(categoryUpdateRequest.getId());
+		Category category = findCategoryById(categoryUpdateRequest.getId(), userId);
 		category.setName(categoryUpdateRequest.getName());
 		categoryRepository.save(category);
 		log.info("category {} is updated.", category.getId());
@@ -60,22 +60,31 @@ public class CategoryService {
 		return categories.stream().map(this	::toCategoryResponse).collect(Collectors.toList());
 	}
 
-	public CategoryResponse deleteCategory(Long id) throws CategoryNotFoundException {
+	public CategoryResponse deleteCategory(Long id, Long userId) throws CategoryNotFoundException {
 
-		Category category = findCategoryById(id);
+		Category category = findCategoryById(id, userId);
 		category.setEnable(null);
 		categoryRepository.save(category);
 		log.info("category {} is deleted.", category.getId());
 		return toCategoryResponse(category);
 	}
 
-	public CategoryResponse findById(Long id) throws CategoryNotFoundException
+	public CategoryResponse findById(Long id, Long userId) throws CategoryNotFoundException
 	{
-		return toCategoryResponse(categoryRepository.findById(id).orElseThrow(CategoryNotFoundException::new));
+		return toCategoryResponse(findCategoryById(id, userId));
 	}
-	public Category findCategoryById(Long id) throws CategoryNotFoundException
+
+	/**
+	 * Finds a category of the given user. A category that belongs to somebody else is reported as not found.
+	 */
+	public Category findCategoryById(Long id, Long userId) throws CategoryNotFoundException
 	{
-		return categoryRepository.findById(id).orElseThrow(CategoryNotFoundException::new);
+		Category category = userId == null ? null : categoryRepository.findByIdAndUserId(id, userId);
+		if(category == null)
+		{
+			throw new CategoryNotFoundException();
+		}
+		return category;
 	}
 
 	public Category findCategoryByNameAndUserId(String name, Long userId)

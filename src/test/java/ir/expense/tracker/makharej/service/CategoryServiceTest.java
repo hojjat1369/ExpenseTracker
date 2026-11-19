@@ -19,8 +19,6 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
-
 
 @ExtendWith(MockitoExtension.class)
 public class CategoryServiceTest {
@@ -69,19 +67,19 @@ public class CategoryServiceTest {
 	@Test
 	public void findCategoryByIdOk() throws CategoryNotFoundException {
 		Category category = Category.builder().name(categoryRequest.getName()).build();
-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.of(category));
+		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(category);
 
-		Category categoryById = categoryService.findCategoryById(123L);
+		Category categoryById = categoryService.findCategoryById(123L, userId);
 
 		Assertions.assertThat(categoryById.getName()).isEqualTo(category.getName());
 	}
 
 	@Test
 	public void findCategoryByIdNotFound() throws CategoryNotFoundException {
-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
+		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(null);
 
 		Assertions.assertThatThrownBy(() -> {
-			categoryService.findCategoryById(123L);
+			categoryService.findCategoryById(123L, userId);
 		}).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
 
 	}
@@ -90,10 +88,10 @@ public class CategoryServiceTest {
 	public void updateCategoryIdNotFound() throws CategoryNotFoundException {
 
 		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123L).name("updatedCategoryName").build();
-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
+		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(null);
 
 		Assertions.assertThatThrownBy(() -> {
-			categoryService.updateCategory(request);
+			categoryService.updateCategory(request, userId);
 		}).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
 
 	}
@@ -103,9 +101,9 @@ public class CategoryServiceTest {
 
 		Category category = Category.builder().name(categoryRequest.getName()).build();
 		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123L).name("updatedCategoryName").build();
-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(category));
+		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(category);
 
-		CategoryResponse updatedCategory = categoryService.updateCategory(request);
+		CategoryResponse updatedCategory = categoryService.updateCategory(request, userId);
 		Assertions.assertThat(updatedCategory.getName()).isEqualTo(category.getName());
 
 	}
@@ -113,10 +111,10 @@ public class CategoryServiceTest {
 	@Test
 	public void deleteCategoryIdNotFound() throws CategoryNotFoundException {
 
-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(null));
+		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(null);
 
 		Assertions.assertThatThrownBy(() -> {
-			categoryService.deleteCategory(123L);
+			categoryService.deleteCategory(123L, userId);
 		}).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
 
 	}
@@ -125,10 +123,35 @@ public class CategoryServiceTest {
 	public void deleteCategoryOk() throws CategoryNotFoundException {
 
 		Category category = Category.builder().name(categoryRequest.getName()).build();
-		Mockito.when(categoryRepository.findById(123L)).thenReturn(Optional.ofNullable(category));
+		Mockito.when(categoryRepository.findByIdAndUserId(123L, userId)).thenReturn(category);
 
-		CategoryResponse deletedCategory = categoryService.deleteCategory(123L);
+		CategoryResponse deletedCategory = categoryService.deleteCategory(123L, userId);
 		Assertions.assertThat(deletedCategory.getName()).isEqualTo(category.getName());
 
+	}
+
+	@Test
+	public void categoryOfAnotherUserIsNotFound() {
+
+		Long anotherUserId = 444L;
+		Category category = Category.builder().name(categoryRequest.getName()).user(user).build();
+		Mockito.when(categoryRepository.findByIdAndUserId(123L, anotherUserId)).thenReturn(null);
+		CategoryUpdateRequest request = CategoryUpdateRequest.builder().id(123L).name("hijacked").build();
+
+		Assertions.assertThatThrownBy(() -> categoryService.findById(123L, anotherUserId)).isInstanceOf(CategoryNotFoundException.class).hasMessage(ErrorMessages.CATEGORY_NOT_FOUND_EXCEPTION);
+		Assertions.assertThatThrownBy(() -> categoryService.updateCategory(request, anotherUserId)).isInstanceOf(CategoryNotFoundException.class);
+		Assertions.assertThatThrownBy(() -> categoryService.deleteCategory(123L, anotherUserId)).isInstanceOf(CategoryNotFoundException.class);
+
+		Mockito.verify(categoryRepository, Mockito.times(3)).findByIdAndUserId(123L, anotherUserId);
+		Mockito.verify(categoryRepository, Mockito.never()).findById(Mockito.any());
+		Mockito.verify(categoryRepository, Mockito.never()).save(Mockito.any());
+	}
+
+	@Test
+	public void unknownCallerCanNotFindAnyCategory() {
+
+		Assertions.assertThatThrownBy(() -> categoryService.findCategoryById(123L, null)).isInstanceOf(CategoryNotFoundException.class);
+
+		Mockito.verifyNoInteractions(categoryRepository);
 	}
 }

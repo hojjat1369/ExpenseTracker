@@ -19,10 +19,11 @@ import ir.expense.tracker.makharej.service.CategoryService;
 import ir.expense.tracker.makharej.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 
 
@@ -45,25 +46,25 @@ public class ExpenseController {
 	@PatchMapping
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
-	public ExpenseResponse updateExpense(@Valid @RequestBody ExpenseUpdateRequest request) throws ExpenseNotFoundException, CategoryNotFoundException {
+	public ExpenseResponse updateExpense(@Valid @RequestBody ExpenseUpdateRequest request, @AuthenticationPrincipal(expression = "id") Long userId) throws ExpenseNotFoundException, CategoryNotFoundException {
 
-		return expenseService.updateExpense(request);
+		return expenseService.updateExpense(request, userId);
 	}
 
 	@GetMapping
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
-	public ExpenseResponse findExpenseById(@Valid @RequestParam Long id) throws ExpenseNotFoundException {
+	public ExpenseResponse findExpenseById(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws ExpenseNotFoundException {
 
-		return expenseService.findById(id);
+		return expenseService.findById(id, userId);
 	}
 
 	@DeleteMapping
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
-	public ExpenseResponse delete(@Valid @RequestParam Long id) throws ExpenseNotFoundException {
+	public ExpenseResponse delete(@Valid @RequestParam Long id, @AuthenticationPrincipal(expression = "id") Long userId) throws ExpenseNotFoundException {
 
-		return expenseService.deleteExpense(id);
+		return expenseService.deleteExpense(id, userId);
 	}
 
 	@PostMapping("/find")
